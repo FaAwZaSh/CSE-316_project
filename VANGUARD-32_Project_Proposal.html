@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VANGUARD-32 — Project Proposal</title>
+<style>
+  :root{
+    --blueprint:   #0a2540;
+    --blueprint-2: #0f3358;
+    --grid-line:   rgba(120,170,220,0.14);
+    --paper:       #0c1e33;
+    --ink:         #dce8f5;
+    --ink-dim:     #8fa9c4;
+    --amber:       #ff8a3d;
+    --amber-dim:   #c76a2e;
+    --phosphor:    #6be6c1;
+    --line:        #3a6690;
+    --card:        #102a48;
+    --card-border: #234a72;
+    --mono: 'JetBrains Mono','Roboto Mono',ui-monospace,Consolas,monospace;
+    --display: 'Oswald','Bebas Neue',Impact,sans-serif;
+    --body: 'Inter','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);line-height:1.55;}
+  body{
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-color: var(--paper);
+  }
+  .sheet{max-width:1080px;margin:0 auto;padding:0 40px 80px;}
+  a{color:var(--phosphor);}
+
+  /* ---------- HERO / COVER ---------- */
+  .hero{
+    position:relative;
+    padding:70px 40px 46px;
+    margin:0 0 10px;
+    border-bottom:3px solid var(--amber);
+    background:
+      radial-gradient(ellipse at 15% -10%, rgba(255,138,61,0.14), transparent 55%),
+      linear-gradient(180deg, var(--blueprint-2), var(--blueprint) 70%);
+    overflow:hidden;
+  }
+  .hero::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.025) 40px),
+                       repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.025) 40px);
+  }
+  .hero-inner{position:relative; z-index:1;}
+  .tag{
+    font-family:var(--mono); letter-spacing:.22em; font-size:12px; color:var(--amber);
+    text-transform:uppercase; display:flex; align-items:center; gap:10px;
+  }
+  .tag::before{content:"";width:26px;height:2px;background:var(--amber);display:inline-block;}
+  h1.title{
+    font-family:var(--display); font-weight:600; letter-spacing:.02em;
+    font-size:76px; margin:10px 0 6px; color:#fff; text-transform:uppercase;
+    text-shadow:0 0 30px rgba(107,230,193,0.15);
+  }
+  .subtitle{font-size:19px; color:var(--ink-dim); max-width:640px; margin-bottom:26px;}
+  .hero-meta{display:flex; flex-wrap:wrap; gap:28px; font-family:var(--mono); font-size:12.5px; color:var(--ink-dim);}
+  .hero-meta b{color:var(--phosphor); font-weight:600;}
+  .corner-bracket{position:absolute; width:34px; height:34px; border:2px solid var(--amber-dim); opacity:.8;}
+  .cb-tl{top:18px; left:18px; border-right:none; border-bottom:none;}
+  .cb-br{bottom:18px; right:18px; border-left:none; border-top:none;}
+
+  /* ---------- SECTION CHROME ---------- */
+  section.chapter{margin-top:56px;}
+  .chapter-head{display:flex; align-items:baseline; gap:16px; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:22px;}
+  .chapter-num{font-family:var(--mono); font-size:14px; color:var(--amber); border:1px solid var(--amber-dim); border-radius:3px; padding:2px 8px;}
+  h2.chapter-title{font-family:var(--display); text-transform:uppercase; letter-spacing:.03em; font-size:28px; margin:0; color:#fff;}
+  h3{font-family:var(--display); text-transform:uppercase; letter-spacing:.02em; font-size:17px; color:var(--phosphor); margin:26px 0 10px;}
+  p{color:var(--ink); font-size:15px;}
+  ul{padding-left:20px;} li{margin-bottom:6px; font-size:15px;}
+  .lede{font-size:16.5px; color:var(--ink); border-left:3px solid var(--amber); padding-left:16px; margin:0 0 20px;}
+
+  /* ---------- CARDS / GRID ---------- */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr;}}
+  .card{background:var(--card); border:1px solid var(--card-border); border-radius:6px; padding:18px 20px;}
+  .card h4{margin:0 0 10px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; color:var(--amber); text-transform:uppercase;}
+  .card p, .card li{font-size:13.8px; color:var(--ink-dim);}
+  .pill{display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid var(--phosphor); color:var(--phosphor); margin:2px 4px 2px 0;}
+
+  /* ---------- TABLE ---------- */
+  table{width:100%; border-collapse:collapse; margin:14px 0 6px; font-size:13.6px;}
+  th,td{border:1px solid var(--card-border); padding:9px 12px; text-align:left; vertical-align:top;}
+  th{background:var(--blueprint-2); color:var(--amber); font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:.04em;}
+  td{color:var(--ink-dim);}
+  td b, td code{color:var(--ink);}
+  code{font-family:var(--mono); background:rgba(107,230,193,0.08); color:var(--phosphor); padding:1px 5px; border-radius:3px; font-size:12.5px;}
+  tr:nth-child(even) td{background:rgba(255,255,255,0.015);}
+
+  /* ---------- DIAGRAM WRAP ---------- */
+  .diagram-frame{border:1px solid var(--card-border); border-radius:8px; background:var(--blueprint); padding:14px; margin:18px 0;}
+  .diagram-caption{font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); text-align:center; margin-top:6px; letter-spacing:.04em;}
+  svg text{font-family:var(--mono);}
+
+  /* ---------- TIMELINE ---------- */
+  .timeline{margin:24px 0 8px;}
+  .track{position:relative; height:10px; background:var(--card-border); border-radius:6px; margin:34px 0 10px;}
+  .track .seg{position:absolute; top:0; height:10px; border-radius:6px;}
+  .seg1{left:0%; width:50%; background:linear-gradient(90deg,#3a6690,#6be6c1);}
+  .seg2{left:50%; width:50%; background:linear-gradient(90deg,#c76a2e,#ff8a3d);}
+  .week-labels{display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:var(--ink-dim);}
+  .stage-block{margin-top:16px;}
+  .stage-head{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .dot{width:11px;height:11px;border-radius:50%;}
+  .dot.blue{background:var(--phosphor);} .dot.amber{background:var(--amber);}
+  .stage-title{font-family:var(--display); letter-spacing:.02em; font-size:16px; color:#fff; text-transform:uppercase;}
+  .milestone{display:flex; gap:12px; padding:8px 0; border-bottom:1px dashed var(--card-border);}
+  .milestone:last-child{border-bottom:none;}
+  .mid{font-family:var(--mono); color:var(--amber); font-size:12.5px; min-width:44px;}
+  .mbody b{color:var(--ink);} .mbody{font-size:13.8px; color:var(--ink-dim);}
+
+  /* ---------- MEMBERS ---------- */
+  .member{border-left:3px solid var(--phosphor); padding-left:14px;}
+  .member h4{color:#fff; font-family:var(--display); text-transform:uppercase; font-size:15px; letter-spacing:.02em; margin:0 0 4px;}
+
+  /* ---------- CHALLENGE ROWS ---------- */
+  .chal{display:grid; grid-template-columns:170px 1fr; gap:14px; padding:12px 0; border-bottom:1px solid var(--card-border);}
+  .chal:last-child{border-bottom:none;}
+  .chal .label{font-family:var(--mono); color:var(--amber); font-size:12.5px; text-transform:uppercase; letter-spacing:.03em;}
+  .chal .body p{margin:0 0 4px; font-size:13.8px;}
+  .chal .mit{color:var(--phosphor); font-size:13.2px;}
+
+  footer{margin-top:70px; padding-top:20px; border-top:1px solid var(--line); font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); display:flex; justify-content:space-between;}
+
+  .kpi-strip{display:flex; flex-wrap:wrap; gap:14px; margin:18px 0;}
+  .kpi{flex:1; min-width:150px; background:var(--card); border:1px solid var(--card-border); border-radius:6px; padding:14px 16px;}
+  .kpi .num{font-family:var(--display); font-size:26px; color:var(--phosphor);}
+  .kpi .lab{font-family:var(--mono); font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+<div class="hero">
+  <span class="corner-bracket cb-tl"></span><span class="corner-bracket cb-br"></span>
+  <div class="hero-inner">
+    <div class="tag">Embedded Systems Course &middot; Project Proposal</div>
+    <h1 class="title">VANGUARD&#8209;32</h1>
+    <div class="subtitle">Autonomous Smart Perimeter Defense &amp; Active Countermeasure Platform — a multi-sensor-fusion targeting turret built around the ATmega32.</div>
+    <div class="hero-meta">
+      <span>PLATFORM: <b>ATmega32&#8209;16PU</b></span>
+      <span>DURATION: <b>6 Weeks</b></span>
+      <span>TEAM SIZE: <b>3 Members</b></span>
+      <span>STATUS: <b>Proposal &middot; Rev 1.0</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="sheet">
+
+  <!-- 1. MOTIVATION -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">01</span><h2 class="chapter-title">Motivation</h2></div>
+
+    <p class="lede">Single-sensor security systems trigger too often on nothing and verify nothing before they do — VANGUARD-32 fixes that with layered, automated confirmation.</p>
+
+    <h3>Problem Description</h3>
+    <p>Conventional perimeter security relies on a single sensor type — usually a passive infrared (PIR) detector or an optical tripwire. These devices cannot distinguish a person from wind-blown debris, a stray animal, or a temperature swing, so they generate frequent false alarms. Worse, they are purely passive: they cannot re-orient themselves toward the disturbance, confirm that a real, physically-present target exists, or respond without a human operator watching a monitor around the clock.</p>
+
+    <h3>Why This Problem Matters</h3>
+    <p>Remote installations — substations, warehouses, border outposts, industrial yards — often have no on-site guard. A system that can detect, <em>verify</em>, and react on its own removes the human-latency bottleneck that lets real intrusions go unanswered for minutes at a time, while also cutting the false-alarm fatigue that causes real operators to start ignoring alerts altogether.</p>
+
+    <h3>Why Our Group Selected This Project</h3>
+    <p>VANGUARD-32 is not one sensor demo bolted onto an MCU — it is a complete embedded engineering problem. It forces us to combine real-time multi-sensor fusion, closed-loop dual-axis actuation, three simultaneous communication buses (I&sup2;C, SPI, UART), and sub-millisecond interrupt handling, all on an 8-bit, resource-constrained ATmega32. That breadth is exactly what this course is meant to test.</p>
+
+    <h3>Main Objectives</h3>
+    <div class="grid2">
+      <div class="card"><h4>01 &middot; Sector Triangulation</h4><p>Detect intrusion vectors across a 180&deg; field split into three independent sectors using low-latency hardware interrupts (no polling).</p></div>
+      <div class="card"><h4>02 &middot; Pan-Tilt Acquisition</h4><p>Slew a 2-axis turret toward the triggered sector within &lt;500&nbsp;ms using hardware PWM.</p></div>
+      <div class="card"><h4>03 &middot; Multi-Modal Verification</h4><p>Confirm a real physical target via IR thermal delta (&Delta;T) and laser time-of-flight distance (R) over I&sup2;C before trusting the alarm.</p></div>
+      <div class="card"><h4>04 &middot; Wireless IFF Handshake</h4><p>Authenticate personnel carrying an encrypted RF badge over SPI to prevent friendly engagements.</p></div>
+      <div class="card"><h4>05 &middot; Active Countermeasure</h4><p>Trigger an automated deterrence sequence (strobe / solenoid) only after a hostile target is confirmed.</p></div>
+      <div class="card"><h4>06 &middot; Telemetry &amp; Black Box</h4><p>Stream a live tactical radar view to a PC over UART while logging every incident to a MicroSD card.</p></div>
+    </div>
+  </section>
+
+  <!-- 2. EQUIPMENT -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">02</span><h2 class="chapter-title">Equipment</h2></div>
+
+    <h3>Hardware Components</h3>
+    <table>
+      <tr><th>Component</th><th>Purpose</th></tr>
+      <tr><td><b>ATmega32-16PU</b></td><td>Primary 8-bit AVR controller — runs the full detection-verification-response FSM.</td></tr>
+      <tr><td><b>RCWL-0516 / PIR array (&times;3)</b></td><td>Microwave Doppler / passive-IR motion sensors, one per sector, wired to INT0&ndash;INT2.</td></tr>
+      <tr><td><b>MLX90614</b></td><td>Contactless IR thermometer (I&sup2;C) — confirms a heat-emitting body is present.</td></tr>
+      <tr><td><b>VL53L0X</b></td><td>Laser time-of-flight sensor (I&sup2;C) — confirms a physically solid object at measurable range.</td></tr>
+      <tr><td><b>nRF24L01+ (&times;2)</b></td><td>2.4&nbsp;GHz RF transceivers (SPI) for the wireless Friend-or-Foe challenge/response link.</td></tr>
+      <tr><td><b>MicroSD card module</b></td><td>On-board black-box logger for timestamps, angles, and sensor readings (SPI).</td></tr>
+      <tr><td><b>SG90 / MG996R servos (&times;2)</b></td><td>Hardware-PWM driven pan and tilt axes for the turret.</td></tr>
+      <tr><td><b>FTDI FT232RL</b></td><td>USB&ndash;UART bridge streaming telemetry to the PC dashboard at 115200&nbsp;baud.</td></tr>
+      <tr><td><b>MOSFET driver + strobe/solenoid</b></td><td>Simulated active countermeasure output stage.</td></tr>
+      <tr><td><b>16&times;2 I&sup2;C LCD</b></td><td>Local read-out of system state, sector, and verification status.</td></tr>
+      <tr><td><b>LM2596 buck converters (&times;2)</b></td><td>Isolated 5V logic rail and 6V servo rail to prevent brown-outs.</td></tr>
+    </table>
+
+    <h3>Software &amp; Development Tools</h3>
+    <div class="grid2">
+      <div class="card"><h4>Firmware</h4><p>Microchip Studio + AVR-GCC — bare-metal, register-level C. No Arduino abstraction layer.</p></div>
+      <div class="card"><h4>Flashing</h4><p>USBasp / eXtreme Burner for programming the ATmega32 over ISP.</p></div>
+      <div class="card"><h4>Simulation</h4><p>Proteus VSM — validates I&sup2;C timing, PWM waveforms, and interrupt behaviour before hardware bring-up.</p></div>
+      <div class="card"><h4>PC Dashboard</h4><p>Python 3 (PySerial + Pygame/Tkinter) — real-time tactical radar GUI over UART.</p></div>
+    </div>
+  </section>
+
+  <!-- 3. SYSTEM DESIGN -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">03</span><h2 class="chapter-title">System Design</h2></div>
+    <p>The ATmega32 sits at the centre of three sensing spokes, two actuation spokes, and two communication spokes. Every arrow below is a real electrical bus, not a conceptual link.</p>
+
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1180 660" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6be6c1"/></marker>
+          <marker id="arrowAmb" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ff8a3d"/></marker>
+        </defs>
+
+        <!-- center chip -->
+        <rect x="470" y="270" width="240" height="130" rx="8" fill="#0f3358" stroke="#ff8a3d" stroke-width="2.5"/>
+        <text x="590" y="320" text-anchor="middle" font-size="20" fill="#ffffff" font-weight="700">ATmega32</text>
+        <text x="590" y="342" text-anchor="middle" font-size="11.5" fill="#8fa9c4">Central FSM Controller</text>
+        <text x="590" y="360" text-anchor="middle" font-size="10.5" fill="#6be6c1">GPIO&nbsp; ADC&nbsp; PWM&nbsp; INT&nbsp; I&#178;C&nbsp; SPI&nbsp; UART</text>
+
+        <!-- Sector sensors (top-left) -->
+        <rect x="40" y="40" width="220" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="150" y="66" text-anchor="middle" font-size="13.5" fill="#fff">Sector PIR / RCWL-0516</text>
+        <text x="150" y="84" text-anchor="middle" font-size="11" fill="#8fa9c4">Left &middot; Center &middot; Right</text>
+        <text x="150" y="102" text-anchor="middle" font-size="10.5" fill="#6be6c1">INT0 / INT1 / INT2</text>
+        <path d="M260,90 L470,300" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Thermal (left) -->
+        <rect x="40" y="150" width="220" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="150" y="176" text-anchor="middle" font-size="13.5" fill="#fff">MLX90614</text>
+        <text x="150" y="194" text-anchor="middle" font-size="11" fill="#8fa9c4">Contactless IR Thermal Sensor</text>
+        <text x="150" y="212" text-anchor="middle" font-size="10.5" fill="#6be6c1">I&#178;C &middot; addr 0x5A</text>
+        <path d="M260,195 L470,300" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Battery ADC (bottom-left) -->
+        <rect x="40" y="480" width="220" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="150" y="506" text-anchor="middle" font-size="13.5" fill="#fff">Battery Voltage Divider</text>
+        <text x="150" y="524" text-anchor="middle" font-size="11" fill="#8fa9c4">Supply Health Monitor</text>
+        <text x="150" y="542" text-anchor="middle" font-size="10.5" fill="#6be6c1">ADC0 (PA0)</text>
+        <path d="M260,510 L470,380" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Status LCD (bottom, left-mid) -->
+        <rect x="330" y="560" width="200" height="70" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="430" y="586" text-anchor="middle" font-size="13.5" fill="#fff">16&times;2 LCD</text>
+        <text x="430" y="604" text-anchor="middle" font-size="11" fill="#8fa9c4">Local Status Display</text>
+        <text x="430" y="620" text-anchor="middle" font-size="10.5" fill="#6be6c1">I&#178;C &middot; shared bus</text>
+        <path d="M480,560 L540,400" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- ToF (right) -->
+        <rect x="920" y="150" width="220" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="1030" y="176" text-anchor="middle" font-size="13.5" fill="#fff">VL53L0X</text>
+        <text x="1030" y="194" text-anchor="middle" font-size="11" fill="#8fa9c4">Laser Time-of-Flight Sensor</text>
+        <text x="1030" y="212" text-anchor="middle" font-size="10.5" fill="#6be6c1">I&#178;C &middot; addr 0x29</text>
+        <path d="M920,195 L710,300" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Servos (top-right) -->
+        <rect x="920" y="40" width="220" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="1030" y="66" text-anchor="middle" font-size="13.5" fill="#fff">Pan / Tilt Servos</text>
+        <text x="1030" y="84" text-anchor="middle" font-size="11" fill="#8fa9c4">2-Axis Turret Slewing</text>
+        <text x="1030" y="102" text-anchor="middle" font-size="10.5" fill="#ff8a3d">Timer0 OC0 / Timer2 OC2</text>
+        <path d="M710,300 L920,90" stroke="#ff8a3d" stroke-width="2" fill="none" marker-end="url(#arrowAmb)"/>
+
+        <!-- nRF24 IFF (bottom-right) -->
+        <rect x="920" y="330" width="220" height="90" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="1030" y="356" text-anchor="middle" font-size="13.5" fill="#fff">nRF24L01+ &nbsp;(IFF)</text>
+        <text x="1030" y="374" text-anchor="middle" font-size="11" fill="#8fa9c4">Friend-or-Foe RF Handshake</text>
+        <text x="1030" y="392" text-anchor="middle" font-size="10.5" fill="#6be6c1">SPI &middot; CS_RF (PD5)</text>
+        <text x="1030" y="408" text-anchor="middle" font-size="10" fill="#ff8a3d">&#8596; Wearable Badge (remote)</text>
+        <path d="M710,340 L920,375" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+        <path d="M920,375 L710,340" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- MicroSD (bottom, right-mid) -->
+        <rect x="650" y="560" width="200" height="70" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="750" y="586" text-anchor="middle" font-size="13.5" fill="#fff">MicroSD Module</text>
+        <text x="750" y="604" text-anchor="middle" font-size="11" fill="#8fa9c4">Incident Black Box</text>
+        <text x="750" y="620" text-anchor="middle" font-size="10.5" fill="#6be6c1">SPI &middot; CS_SD (PD4)</text>
+        <path d="M700,560 L650,400" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Countermeasure (far bottom center-left) -->
+        <rect x="470" y="440" width="220" height="80" rx="6" fill="#1a1420" stroke="#ff8a3d" stroke-width="1.6"/>
+        <text x="580" y="466" text-anchor="middle" font-size="13.5" fill="#fff">Countermeasure MOSFET</text>
+        <text x="580" y="484" text-anchor="middle" font-size="11" fill="#ffb98a">Strobe / Solenoid</text>
+        <text x="580" y="502" text-anchor="middle" font-size="10.5" fill="#ff8a3d">GPIO &middot; PD6</text>
+        <path d="M590,400 L590,440" stroke="#ff8a3d" stroke-width="2" fill="none" marker-end="url(#arrowAmb)"/>
+
+        <!-- UART PC dashboard (top center) -->
+        <rect x="470" y="40" width="240" height="80" rx="6" fill="#102a48" stroke="#234a72"/>
+        <text x="590" y="66" text-anchor="middle" font-size="13.5" fill="#fff">PC Tactical Radar GUI</text>
+        <text x="590" y="84" text-anchor="middle" font-size="11" fill="#8fa9c4">Python (PySerial + Pygame)</text>
+        <text x="590" y="102" text-anchor="middle" font-size="10.5" fill="#6be6c1">USART &middot; 115200 baud &middot; FTDI</text>
+        <path d="M590,270 L590,120" stroke="#6be6c1" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+        <!-- Legend -->
+        <line x1="40" y1="640" x2="70" y2="640" stroke="#6be6c1" stroke-width="2"/><text x="78" y="644" font-size="11" fill="#8fa9c4">Sense / Data / Comms bus</text>
+        <line x1="290" y1="640" x2="320" y2="640" stroke="#ff8a3d" stroke-width="2"/><text x="328" y="644" font-size="11" fill="#8fa9c4">Actuation output</text>
+      </svg>
+      <div class="diagram-caption">FIG. 1 — VANGUARD-32 SYSTEM BLOCK DIAGRAM</div>
+    </div>
+
+    <h3>Role of Each Component</h3>
+    <ul>
+      <li><b>Sensing subsystem:</b> Three PIR/RCWL sector sensors fire hardware interrupts the instant motion crosses a zone — zero polling overhead. MLX90614 and VL53L0X then independently confirm the target is warm and physically solid before anything is trusted as real.</li>
+      <li><b>Actuation subsystem:</b> Pan/tilt servos re-aim the sensor head at the triggered sector; the MOSFET-driven strobe/solenoid executes the deterrence response only after verification passes.</li>
+      <li><b>Communication &amp; storage subsystem:</b> nRF24L01 runs the IFF challenge-response over SPI; MicroSD logs every event; the FTDI bridge streams live telemetry to the PC radar GUI.</li>
+    </ul>
+
+    <h3>Key ATmega32 Pins &amp; Interfaces</h3>
+    <table>
+      <tr><th>Pin</th><th>Function</th><th>Peripheral</th></tr>
+      <tr><td><code>PD2 (INT0)</code></td><td>Left sector trigger</td><td>External Interrupt</td></tr>
+      <tr><td><code>PD3 (INT1)</code></td><td>Center sector trigger</td><td>External Interrupt</td></tr>
+      <tr><td><code>PB2 (INT2)</code></td><td>Right sector trigger</td><td>External Interrupt</td></tr>
+      <tr><td><code>PB3 (OC0)</code></td><td>Pan servo control</td><td>Timer0 PWM</td></tr>
+      <tr><td><code>PD7 (OC2)</code></td><td>Tilt servo control</td><td>Timer2 PWM</td></tr>
+      <tr><td><code>PC0 (SCL) / PC1 (SDA)</code></td><td>MLX90614, VL53L0X, LCD — shared bus</td><td>Hardware TWI (I&sup2;C) @ 100 kHz</td></tr>
+      <tr><td><code>PB5/PB6/PB7 (MOSI/MISO/SCK)</code></td><td>nRF24L01 + MicroSD — shared bus</td><td>Hardware SPI @ 4 MHz</td></tr>
+      <tr><td><code>PD4 / PD5</code></td><td>CS_SD / CS_RF</td><td>GPIO chip-select lines</td></tr>
+      <tr><td><code>PD6</code></td><td>Countermeasure gate</td><td>GPIO output</td></tr>
+      <tr><td><code>PA0 (ADC0)</code></td><td>Battery voltage</td><td>ADC</td></tr>
+      <tr><td><code>PD0 (RXD) / PD1 (TXD)</code></td><td>PC telemetry link</td><td>USART @ 115200 baud</td></tr>
+    </table>
+  </section>
+
+  <!-- 4. ROLE OF ATmega32 -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">04</span><h2 class="chapter-title">Role of the ATmega32</h2></div>
+    <p class="lede">The ATmega32 is not a passenger reading pre-processed data — it owns every stage of the decision loop, from raw interrupt to final actuation.</p>
+
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1000 260" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="arrow2" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#6be6c1"/></marker></defs>
+        <rect x="20" y="90" width="190" height="80" rx="8" fill="#102a48" stroke="#6be6c1" stroke-width="1.8"/>
+        <text x="115" y="125" text-anchor="middle" font-size="14" fill="#fff">IDLE SCAN</text>
+        <text x="115" y="145" text-anchor="middle" font-size="10.5" fill="#8fa9c4">Interrupts armed</text>
+
+        <path d="M210,130 L280,130" stroke="#6be6c1" stroke-width="2" marker-end="url(#arrow2)"/>
+        <text x="245" y="120" text-anchor="middle" font-size="10" fill="#ff8a3d">trigger</text>
+
+        <rect x="280" y="90" width="210" height="80" rx="8" fill="#102a48" stroke="#6be6c1" stroke-width="1.8"/>
+        <text x="385" y="120" text-anchor="middle" font-size="14" fill="#fff">PAN-TILT SLEW</text>
+        <text x="385" y="140" text-anchor="middle" font-size="10.5" fill="#8fa9c4">Timer0/2 PWM aim &lt;500ms</text>
+        <text x="385" y="156" text-anchor="middle" font-size="10.5" fill="#8fa9c4">at triggered sector</text>
+
+        <path d="M490,130 L570,130" stroke="#6be6c1" stroke-width="2" marker-end="url(#arrow2)"/>
+
+        <rect x="570" y="90" width="230" height="80" rx="8" fill="#102a48" stroke="#6be6c1" stroke-width="1.8"/>
+        <text x="685" y="115" text-anchor="middle" font-size="14" fill="#fff">VERIFY</text>
+        <text x="685" y="134" text-anchor="middle" font-size="10.5" fill="#8fa9c4">Heat (I&#178;C) + ToF (I&#178;C)</text>
+        <text x="685" y="150" text-anchor="middle" font-size="10.5" fill="#8fa9c4">+ IFF badge check (SPI)</text>
+
+        <path d="M685,170 L685,210 L115,210 L115,170" stroke="#8fa9c4" stroke-width="1.6" fill="none" stroke-dasharray="4,3"/>
+        <text x="400" y="225" text-anchor="middle" font-size="10" fill="#8fa9c4">friend / no confirmation &rarr; reset to idle scan</text>
+
+        <path d="M800,130 L900,130" stroke="#ff8a3d" stroke-width="2.2" marker-end="url(#arrow2)"/>
+        <text x="850" y="118" text-anchor="middle" font-size="10" fill="#ff8a3d">hostile</text>
+
+        <rect x="800" y="0" width="0" height="0"/>
+        <rect x="800" y="10" width="180" height="70" rx="8" fill="#1a1420" stroke="#ff8a3d" stroke-width="1.8" transform="translate(0,-10)"/>
+        <text x="890" y="35" text-anchor="middle" font-size="13" fill="#fff">COUNTERMEASURE</text>
+        <text x="890" y="53" text-anchor="middle" font-size="10" fill="#ffb98a">Strobe/solenoid + RF alert</text>
+        <text x="890" y="68" text-anchor="middle" font-size="10" fill="#ffb98a">+ SD log</text>
+        <path d="M890,10 L890,-10" stroke="none"/>
+      </svg>
+      <div class="diagram-caption">FIG. 2 — ATmega32 FINITE STATE MACHINE</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h4>Interrupts &amp; GPIO</h4>
+        <p>INT0/INT1/INT2 catch sector triggers in sub-millisecond time with zero CPU polling. GPIO lines drive the two SPI chip-selects and the countermeasure MOSFET gate.</p>
+      </div>
+      <div class="card">
+        <h4>Timers &amp; PWM</h4>
+        <p>Timer0 &amp; Timer2 generate independent 50&nbsp;Hz PWM on OC0/OC2 for pan and tilt servos. Timer1 (16-bit) runs as a free-running microsecond clock for non-blocking task scheduling.</p>
+      </div>
+      <div class="card">
+        <h4>I&sup2;C (TWI)</h4>
+        <p>One 100&nbsp;kHz bus shared by MLX90614 (0x5A), VL53L0X (0x29), and the status LCD — the ATmega32 arbitrates all three as bus master.</p>
+      </div>
+      <div class="card">
+        <h4>SPI</h4>
+        <p>4&nbsp;MHz master-mode bus multiplexed between nRF24L01 (low-latency IFF packets) and MicroSD (bulk sector writes), separated by software-controlled CS lines with explicit release routines.</p>
+      </div>
+      <div class="card">
+        <h4>USART</h4>
+        <p>115200&nbsp;baud continuous telemetry frames (<code>$ANGLE,DIST,TEMP,STATUS#</code>) feeding the live PC radar GUI.</p>
+      </div>
+      <div class="card">
+        <h4>ADC</h4>
+        <p>Single-channel (ADC0) supply-voltage monitor to flag brown-out risk before servo current spikes cause a reset.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. IMPLEMENTATION PLAN -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">05</span><h2 class="chapter-title">Implementation Plan</h2></div>
+
+    <h3>Expected Outcome</h3>
+    <p>A working prototype with a dual-axis targeting turret that autonomously detects an intrusion sector, slews to it, cross-verifies the target with thermal and laser data, checks for an IFF badge, and — only if unauthorized — fires a countermeasure while logging the event and streaming it live to a PC radar dashboard.</p>
+
+    <div class="kpi-strip">
+      <div class="kpi"><div class="num">6</div><div class="lab">Weeks Total</div></div>
+      <div class="kpi"><div class="num">2</div><div class="lab">Development Stages</div></div>
+      <div class="kpi"><div class="num">9</div><div class="lab">Milestones</div></div>
+      <div class="kpi"><div class="num">3</div><div class="lab">Team Members</div></div>
+    </div>
+
+    <div class="timeline">
+      <div class="track"><div class="seg seg1"></div><div class="seg seg2"></div></div>
+      <div class="week-labels"><span>Week 1</span><span>Week 2</span><span>Week 3</span><span>Week 4</span><span>Week 5</span><span>Week 6</span></div>
+    </div>
+
+    <div class="stage-block">
+      <div class="stage-head"><span class="dot blue"></span><span class="stage-title">Project Update 1 &nbsp;&middot;&nbsp; Weeks 1&ndash;3</span></div>
+      <div class="milestone"><span class="mid">1.1</span><div class="mbody"><b>Bring-up:</b> ATmega32 clock, power rails, and register-level bare-metal skeleton.</div></div>
+      <div class="milestone"><span class="mid">1.2</span><div class="mbody"><b>Actuation base:</b> Timer0/Timer2 50&nbsp;Hz PWM driving pan and tilt servos independently.</div></div>
+      <div class="milestone"><span class="mid">1.3</span><div class="mbody"><b>Sensing base:</b> Hardware I&sup2;C driver reading MLX90614 temperature and VL53L0X distance.</div></div>
+      <div class="milestone"><span class="mid">1.4</span><div class="mbody"><b>Trigger path:</b> External interrupt handling for multi-sector PIR/Doppler detection.</div></div>
+      <div class="milestone"><span class="mid">&#9679;</span><div class="mbody"><b>Deliverable:</b> Turret automatically slews to an activated sector and prints target distance and temperature over the UART terminal.</div></div>
+    </div>
+
+    <div class="stage-block">
+      <div class="stage-head"><span class="dot amber"></span><span class="stage-title">Final Demonstration &nbsp;&middot;&nbsp; Weeks 4&ndash;6</span></div>
+      <div class="milestone"><span class="mid">2.1</span><div class="mbody"><b>Bus arbitration:</b> Hardware SPI multiplexing between nRF24L01 and MicroSD with independent CS handling. <i>(depends on 1.1)</i></div></div>
+      <div class="milestone"><span class="mid">2.2</span><div class="mbody"><b>IFF logic:</b> Wireless challenge-response handshake implementation. <i>(depends on 2.1)</i></div></div>
+      <div class="milestone"><span class="mid">2.3</span><div class="mbody"><b>PC GUI:</b> Python-based Tactical Radar dashboard over UART. <i>(depends on 1.4)</i></div></div>
+      <div class="milestone"><span class="mid">2.4</span><div class="mbody"><b>Response stage:</b> Active countermeasure MOSFET output integration (strobe/solenoid). <i>(depends on 1.3, 2.2)</i></div></div>
+      <div class="milestone"><span class="mid">2.5</span><div class="mbody"><b>Integration:</b> Enclosure assembly, power-bus decoupling, stress testing, and final tuning.</div></div>
+      <div class="milestone"><span class="mid">&#9679;</span><div class="mbody"><b>Deliverable:</b> Complete platform demonstrating threat detection, verified tracking, friend-or-foe disarm, and live PC radar visualization.</div></div>
+    </div>
+
+    <h3>Group Member Responsibilities</h3>
+    <div class="grid3">
+      <div class="card member"><h4>Member 1</h4><p><b>Embedded Firmware &amp; Control Lead</b></p><p>Register-level driver development (Timers, PWM, I&sup2;C, External Interrupts), core FSM architecture, timing-loop optimization.</p></div>
+      <div class="card member"><h4>Member 2</h4><p><b>Hardware, Power &amp; Actuation Lead</b></p><p>Mechanical pan-tilt turret assembly, power distribution (buck converters/filtering), sensor calibration (MLX90614, VL53L0X), MOSFET countermeasure driver circuitry.</p></div>
+      <div class="card member"><h4>Member 3</h4><p><b>Wireless, Storage &amp; PC GUI Lead</b></p><p>SPI bus management (nRF24L01 + MicroSD file system), IFF protocol logic, Python Tactical Radar GUI development.</p></div>
+    </div>
+  </section>
+
+  <!-- 6. OTHER CONTROLLERS -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">06</span><h2 class="chapter-title">Use of Other Controllers <span style="color:var(--ink-dim); font-size:16px; text-transform:none;">— Optional</span></h2></div>
+    <p>The ATmega32 is the sole main microcontroller executing all core logic, sensor reads, motor control, storage logging, and telemetry — it is not offloading any primary task.</p>
+    <div class="card">
+      <h4>Auxiliary Node: IFF Wearable Badge</h4>
+      <p><b>Why required:</b> The badge must be a small, mobile, battery-powered node physically separate from the turret station — this cannot be the same chip running the turret.</p>
+      <p><b>Controller used:</b> Arduino Nano / ATtiny85.</p>
+      <p><b>Tasks performed:</b> Listens for a 2.4&nbsp;GHz challenge packet from the ATmega32 turret via its own nRF24L01 module and replies with a pre-shared 32-bit authorization hash. It performs no other system function.</p>
+      <p><b>Communication with ATmega32:</b> Strictly wireless, over-the-air 2.4&nbsp;GHz RF packets — no wired link exists between the badge and the main turret.</p>
+    </div>
+  </section>
+
+  <!-- 7. TESTING -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">07</span><h2 class="chapter-title">Testing &amp; Success Criteria</h2></div>
+
+    <h3>Testing Methodology</h3>
+    <table>
+      <tr><th>Test</th><th>Method</th></tr>
+      <tr><td>PWM &amp; Turret Accuracy</td><td>Oscilloscope measurement of OC0/OC2 frequencies; verify stable 50&nbsp;Hz waveforms and smooth angular slewing.</td></tr>
+      <tr><td>Interrupt Latency</td><td>Measure time delta between sector sensor trigger and turret movement initiation.</td></tr>
+      <tr><td>I&sup2;C Bus Stability</td><td>Verify SCL clock integrity at 100&nbsp;kHz with all three devices active simultaneously.</td></tr>
+      <tr><td>RF Handshake Latency</td><td>Range and response-time testing for the nRF24L01 challenge-response loop.</td></tr>
+    </table>
+
+    <h3>Measurable Success Criteria</h3>
+    <table>
+      <tr><th>Metric</th><th>Target</th></tr>
+      <tr><td>Turret slew speed</td><td>Aligns to target sector vector within &lt;500&nbsp;ms of trigger</td></tr>
+      <tr><td>Distance precision</td><td>VL53L0X measures up to 1.5&nbsp;m with &plusmn;5&nbsp;mm accuracy</td></tr>
+      <tr><td>Thermal verification</td><td>Accurately detects &Delta;T &ge; 3&deg;C above ambient</td></tr>
+      <tr><td>IFF handshake</td><td>Challenge-response completes in &lt;30&nbsp;ms</td></tr>
+      <tr><td>Telemetry rate</td><td>PC GUI updates radar graphics &ge;10&nbsp;Hz without frame loss</td></tr>
+    </table>
+
+    <h3>Essential vs. Optional Features</h3>
+    <div class="grid2">
+      <div class="card"><h4>Essential</h4><ul>
+        <li>Multi-sector interrupt detection</li>
+        <li>Dual-axis hardware-PWM servo tracking</li>
+        <li>I&sup2;C thermal &amp; laser distance verification</li>
+        <li>Basic countermeasure trigger output</li>
+      </ul></div>
+      <div class="card"><h4>Optional</h4><ul>
+        <li>MicroSD black-box event logger</li>
+        <li>High-resolution Python PC Radar GUI</li>
+        <li>Audio frequency warning tone generator</li>
+        <li>Battery voltage monitoring via ADC</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- 8. CHALLENGES -->
+  <section class="chapter">
+    <div class="chapter-head"><span class="chapter-num">08</span><h2 class="chapter-title">Challenges &amp; Future Scope</h2></div>
+
+    <h3>Technical &amp; Hardware Challenges</h3>
+    <div class="chal">
+      <div class="label">SPI Contention</div>
+      <div class="body"><p>Sharing the SPI bus between the low-latency nRF24L01 and the bulk-write MicroSD module can cause lockups.</p><p class="mit">Mitigation: dedicated software-controlled CS lines with explicit bus-release routines.</p></div>
+    </div>
+    <div class="chal">
+      <div class="label">Inductive Noise</div>
+      <div class="body"><p>Servo current draw during rapid repositioning can dip the supply and brown-out the MCU.</p><p class="mit">Mitigation: isolated 5V/6V rails from separate buck converters, plus 1000&mu;F bulk decoupling.</p></div>
+    </div>
+    <div class="chal">
+      <div class="label">Blocking I&sup2;C</div>
+      <div class="body"><p>Slow sensor response times could stall the main control loop if read as blocking calls.</p><p class="mit">Mitigation: state-driven non-blocking I&sup2;C polling instead of fixed delays.</p></div>
+    </div>
+
+    <h3>Future Scope</h3>
+    <div class="grid3">
+      <div class="card"><h4>Computer Vision</h4><p>ESP32-CAM co-processor for AI-based facial recognition and visual target classification.</p></div>
+      <div class="card"><h4>360&deg; Slewing</h4><p>Continuous stepper motors + slip rings to replace the 180&deg; servo limit for full perimeter tracking.</p></div>
+      <div class="card"><h4>LoRa Mesh</h4><p>Long-range telemetry upgrade for multi-kilometer networking across several deployed units.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>VANGUARD-32 &middot; Project Proposal Rev 1.0</span>
+    <span>Microcontroller / Microprocessor &amp; Embedded Systems Course</span>
+  </footer>
+</div>
+</body>
+</html>

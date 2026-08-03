@@ -1,0 +1,156 @@
+================================================================================
+STEP-BY-STEP EXECUTION FLOWS
+VANGUARD-32 | OPTIX-32 | KINETI-GRID 32
+================================================================================
+
+--------------------------------------------------------------------------------
+1. VANGUARD-32: Autonomous Smart Perimeter Defense & Tracking Platform
+--------------------------------------------------------------------------------
+
+OVERVIEW:
+A multi-sensor targeting turret that locates perimeter intrusions across 3 zones,
+rotates to the target, verifies living heat & laser distance, authenticates
+friendly RF badges, and fires an active countermeasure.
+
+EXECUTION FLOW:
+
+Step 1: Perimeter Monitoring (IDLE State)
+  - The ATmega32 runs in a low-power idle loop.
+  - Three sector sensors (Left, Center, Right PIR / Microwave Radar) cover a 180-degree field.
+  - HARDWARE ACTION: When an intruder enters a zone, the active sensor pulls its line HIGH,
+    triggering an External Interrupt pin on the MCU (INT0 for Left, INT1 for Center, INT2 for Right).
+
+Step 2: Instant Turret Slewing (TRACKING State)
+  - The MCU immediately executes the corresponding Interrupt Service Routine (ISR),
+    bypassing main loop execution delay.
+  - HARDWARE ACTION: Timer0 (OC0) and Timer2 (OC2) update their 50 Hz hardware PWM duty cycles.
+    The 2-axis Pan-Tilt servos smoothly rotate the top sensor turret directly toward the 
+    triggered sector angle (-45 deg, 0 deg, or +45 deg).
+
+Step 3: Multi-Sensor Target Verification (VERIFY State)
+  - Once the turret aligns with the target sector, the MCU initiates reads over the Hardware TWI (I2C) bus:
+    a) Thermal Verification: Reads the MLX90614 IR sensor. Calculates target heat delta (Delta T)
+       above ambient room baseline to confirm a living entity (human/vehicle exhaust).
+    b) Laser Distance Ranging: Reads the VL53L0X Time-of-Flight (ToF) laser sensor to measure
+       exact target distance (R) in millimeters.
+
+Step 4: Wireless "Friend-or-Foe" Handshake (AUTHENTICATE State)
+  - The MCU toggles software Chip Select (CS) lines to access the nRF24L01 transceiver over Hardware SPI.
+  - HARDWARE ACTION: Transmits an encrypted 32-bit challenge packet into the air and starts a 30 ms timer.
+    * IF AUTHORIZED BADGE IS PRESENT: The wearable badge decrypts the packet and replies with a valid hash.
+      The MCU flags the target as FRIENDLY and stands down.
+    * IF NO BADGE RESPONDS WITHIN 30 ms: The MCU flags the target as an UNAUTHORIZED HOSTILE INTRUDER.
+
+Step 5: Active Countermeasure Engagement (ENGAGE State)
+  - If flagged as hostile, the MCU sets GPIO pin PD6 HIGH.
+  - HARDWARE ACTION: The signal turns on a MOSFET gate, firing a high-intensity tactical warning strobe
+    light and driving a 12V solenoid indicator. Timer1 can simultaneously generate an audible warning tone.
+
+Step 6: Logging & Telemetry Streaming (LOG State)
+  - MicroSD Logging: The MCU selects the MicroSD card on the Hardware SPI bus and appends a time-stamped
+    log frame (Timestamp, Sector Angle, Distance R, Heat Delta T, IFF Status).
+  - PC GUI Streaming: The MCU formats a structured telemetry frame ($ANGLE, DIST, TEMP, HOSTILE#)
+    and streams it over Hardware USART (UART) at 115200 baud to update the PC live radar dashboard.
+
+
+--------------------------------------------------------------------------------
+2. OPTIX-32: Autonomous Anti-Surveillance Glint Locator & Counter-Optic Defense
+--------------------------------------------------------------------------------
+
+OVERVIEW:
+An optical counter-surveillance platform that actively scans perimeters with a 1 kHz 
+modulated laser, detects microvolt retroreflected glint signals from camera lenses, 
+locks onto coordinates, and blinds the target optic with a dazzler strobe.
+
+EXECUTION FLOW:
+
+Step 1: Modulated Laser Perimeter Scanning (SCAN State)
+  - HARDWARE ACTION: Timer1 operates in Fast PWM mode to generate a clock-accurate, continuous
+    1 kHz square wave on pin OC1A. This modulates the power gate of a 650nm red laser diode.
+  - Simultaneously, Timer0 (OC0) and Timer2 (OC2) generate 50 Hz PWM signals driving pan-tilt
+    servos to sweep the modulated laser back and forth across a 180-degree sector.
+
+Step 2: Optical Retroreflection Capture (RECEPTION State)
+  - When the sweeping laser beam strikes a curved glass surface (such as a camera lens, sniper scope,
+    or binoculars), Optical Retroreflection occurs: the lens reflects the laser beam back directly
+    along its vector of origin.
+  - HARDWARE ACTION: A high-speed PIN photodiode array mounted coaxially beside the laser catches
+    the returning glint light pulse.
+
+Step 3: Active Bandpass Noise Filtering (CONDITIONING State)
+  - The raw photodiode signal enters a multi-stage LM358 active bandpass filter circuit.
+  - SIGNAL REJECTION: Ambient sunlight is DC (0 Hz) and indoor lighting flickers at 50 Hz.
+    The active filter strips away these environmental frequencies, passing ONLY signals pulsed
+    at the 1 kHz modulation frequency with 60 dB active gain.
+
+Step 4: Peak Detection & Immediate Lock-On (LOCK State)
+  - The amplified 1 kHz signal feeds into ATmega32 pin PA0 (ADC) and the Analog Comparator (ACSR).
+  - HARDWARE ACTION: The instant a 1 kHz glint voltage spike crosses the calibrated reference
+    threshold, the Analog Comparator triggers an immediate hardware interrupt.
+  - The MCU executes the ISR, instantly halting servo PWM sweep generation. The turret freezes at
+    the exact pan-tilt coordinate where the optical lens was detected.
+
+Step 5: Counter-Optic Engagement (DAZZLE State)
+  - Upon lock-on confirmation, the MCU sets GPIO pin PD6 HIGH.
+  - HARDWARE ACTION: A high-current MOSFET turns on, driving a high-power optical LED strobe /
+    laser dazzler directly down the line of sight to flood and blind the target optic/camera sensor.
+
+Step 6: Silent Alarm & Telemetry Output (ALERT State)
+  - Wireless Alarm: Transmits an encrypted alert packet over Hardware SPI via the nRF24L01 module
+    to a remote handheld receiver.
+  - Data Storage: Appends incident coordinates and glint signal amplitude to the MicroSD card over SPI.
+  - PC Oscilloscope GUI: Streams live photodiode ADC voltage samples and target lock coordinates over
+    Hardware USART (UART) at 115200 baud to the Python tactical display.
+
+
+--------------------------------------------------------------------------------
+3. KINETI-GRID 32: Smart Kinetic Energy Harvesting & Crowd Analytics Platform
+--------------------------------------------------------------------------------
+
+OVERVIEW:
+A smart kinetic floor tile matrix that rectifies and stores footstep energy, calculates 
+milliwatt power output via 10-bit ADC, tracks crowd footfall cadence and speed via interrupts,
+and dynamically routes harvested power to emergency lighting via MOSFET gates.
+
+EXECUTION FLOW:
+
+Step 1: Mechanical Footfall Impact & Rectification (HARVEST State)
+  - A pedestrian steps on the spring-loaded kinetic floor tile, flexing the internal ceramic piezo matrix.
+  - HARDWARE ACTION: Schottky diode bridge rectifiers convert chaotic AC voltage pulses into DC.
+    Overvoltage Zener diode clamps restrict voltage spikes below 5.1V to protect circuit components.
+    The rectified charge flows directly into a supercapacitor bank / Li-ion charger.
+
+Step 2: Real-Time Precision Power Metering (METERING State)
+  - The ATmega32 internal 10-bit ADC continuously samples voltage and current channels at 500 Hz:
+    * PA0 (ADC0): Samples supercapacitor stored voltage level.
+    * PA1 (ADC1): Samples instantaneous piezo harvest current in mA.
+  - HARDWARE ACTION: The MCU calculates Instantaneous Power (P = V * I) and integrates energy over
+    time to compute cumulative energy harvested in milliwatt-hours (mWh).
+
+Step 3: Multi-Zone Footfall & Velocity Analytics (ANALYTICS State)
+  - Piezo voltage taps across 3 distinct floor zones trigger External Interrupt pins (INT0, INT1, INT2).
+  - HARDWARE ACTION:
+    a) Step Counting: Every interrupt trigger increments total footfall counters without CPU polling.
+    b) Velocity Math: Timer1 measures the microsecond time delta between INT0 (Zone 1) and INT1 (Zone 2)
+       triggers as a foot steps across tiles, calculating pedestrian walking speed (v = d / dt).
+
+Step 4: Smart Adaptive Load Routing (ROUTING State)
+  - The MCU Finite State Machine monitors supercapacitor charge status against set thresholds.
+  - HARDWARE ACTION:
+    * When supercap voltage reaches 3.8V, the MCU triggers MOSFET gate PD6 to connect localized
+      emergency floor lights or smart navigation arrows.
+    * Timer0 (OC0) generates a PWM dimming signal to adjust floor LED brightness dynamically
+      based on available stored power reserves.
+
+Step 5: Wireless IoE Telemetry & Black-Box Logging (TELEMETRY State)
+  - Wireless Remote Update: The MCU selects the nRF24L01 module on the Hardware SPI bus and
+    transmits energy metrics and step counts to a remote municipal monitoring station.
+  - Black-Box Event Logging: Toggles CS lines to select the MicroSD card module on the Hardware SPI bus
+    and appends time-stamped hourly harvest totals, step counts, and peak power output.
+
+Step 6: Live PC Power Dashboard Streaming (GUI State)
+  - The MCU formats binary telemetry frames ($VOLT, CURR, POWER, STEPS, SPEED#).
+  - HARDWARE ACTION: Streams data continuously over Hardware USART (UART) at 115200 baud to a
+    Python PC dashboard, rendering real-time power generation oscilloscopes, battery health graphs,
+    and floor crowd heatmaps.
+================================================================================

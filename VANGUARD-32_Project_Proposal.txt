@@ -1,0 +1,261 @@
+================================================================================
+PROJECT PROPOSAL: VANGUARD-32
+Autonomous Smart Perimeter Defense & Active Countermeasure Platform
+================================================================================
+
+1. MOTIVATION
+--------------------------------------------------------------------------------
+Problem Description:
+Conventional security and perimeter defense installations heavily rely on single-sensor
+triggers, such as passive infrared (PIR) detectors or optic tripwires. These systems
+suffer from high false-alarm rates caused by environmental factors (e.g., wind, falling
+leaves, small animals) and lack automated, localized threat verification. Furthermore,
+standard installations are passive—they cannot autonomously orient sensors toward an
+intrusion sector, differentiate authorized personnel from intruders, or trigger targeted
+countermeasures without human intervention.
+
+Importance of the Problem:
+Automated physical security for critical infrastructure, remote military outposts, and
+high-security industrial zones requires rapid target acquisition and verification without
+human latency. Reducing false alarms while maintaining high detection reliability is a core
+challenge in embedded defense engineering. A multi-stage threat verification pipeline
+ensures high operational reliability before initiating alarms or countermeasures.
+
+Why Our Group Selected This Project:
+Our team chose VANGUARD-32 because it represents a complete, real-world embedded system
+engineering challenge. Instead of demonstrating an isolated sensor, this project requires
+integrating real-time multi-sensor fusion, closed-loop actuation, multi-bus digital
+communications, and low-latency interrupt handling on a resource-constrained 8-bit
+microcontroller (ATmega32).
+
+Main Objectives:
+1. Multi-Sector Intrusion Triangulation: Detect intrusion vectors across a 180-degree field
+   split into 3 distinct sectors using low-latency hardware interrupts.
+2. Automated Pan-Tilt Target Acquisition: Direct a 2-axis tracking turret toward the target
+   vector within 500 ms using hardware PWM.
+3. Multi-Modal Target Verification: Measure target thermal radiation (Delta T) and laser
+   time-of-flight distance (R) over a hardware I2C bus to confirm physical presence.
+4. Wireless Friend-or-Foe (IFF) Handshake: Authenticate nearby personnel carrying an
+   encrypted RF badge over SPI to prevent friendly engagements.
+5. Active Countermeasure Simulation: Trigger an automated deterrence sequence (strobe pulse /
+   solenoid actuate) upon confirming an unauthorized hostile target.
+6. Telemetry & Black-Box Logging: Stream real-time tactical radar visuals to a PC over UART
+   while maintaining on-board incident logs on a MicroSD card.
+
+
+2. EQUIPMENT
+--------------------------------------------------------------------------------
+Hardware Components:
+- ATmega32-16PU: Primary 8-bit AVR Microcontroller (System Controller)
+- MLX90614: Contactless IR Thermal Sensor (I2C) for heat signature verification
+- VL53L0X: Laser Time-of-Flight (ToF) Sensor (I2C) for millimeter-accurate distance R
+- RCWL-0516 / PIR Array: Microwave Doppler/PIR Sensors (INT0/INT1/INT2) for sector detection
+- nRF24L01+ (x2): 2.4 GHz RF Transceivers (SPI) for wireless IFF challenge-response badge
+- MicroSD Card Module: On-board black-box event logging via SPI
+- SG90 / MG996R Servos (x2): Hardware PWM-driven motors for 2-axis Pan-Tilt turret slewing
+- FTDI FT232RL Module: USB-to-UART bridge for PC telemetry streaming at 115200 baud
+- MOSFET Drivers & Solenoid/Strobe: Active countermeasure engagement simulation
+- 16x2 I2C LCD Display: Local system status and state display
+- LM2596 Buck Converters: Dual power rails (5V logic, 6V high-current servo rail)
+
+Software & Development Tools:
+- Microchip Studio / AVR-GCC: C programming, register-level driver development, compilation.
+- USBasp / eXtreme Burner: Hardware firmware flashing interface.
+- Proteus VSM: Circuit simulation and hardware validation prior to fabrication.
+- Python 3 (PySerial & Pygame/Tkinter): Real-time PC Tactical Radar GUI dashboard.
+
+
+3. SYSTEM DESIGN
+--------------------------------------------------------------------------------
+System Architecture Diagram:
+
+                        +----------------------------------------+
+                        |    PC Tactical Radar GUI (Python)      |
+                        +----------------------------------------+
+                                            ^
+                                            | Serial @ 115200 Baud (UART)
+ +------------------------+      +----------------------+      +-----------------------+
+ |  Sector PIR / Radar    |----->|                      |----->|  2-Axis Servo Turret  |
+ |  (INT0, INT1, INT2)    |      |                      |      |  (Timer0 & Timer2 PWM)|
+ +------------------------+      |                      |      +-----------------------+
+ |  MLX90614 Thermal IR   |----->|      ATmega32        |----->| VL53L0X Laser ToF     |
+ |  (Hardware TWI / I2C)  |      |    Microcontroller   |      | (Hardware TWI / I2C)  |
+ +------------------------+      |                      |      +-----------------------+
+ |  nRF24L01 Friend/Foe   |<---->|                      |----->| MicroSD Black Box     |
+ |  (Hardware SPI - CS1)  |      |                      |      | (Hardware SPI - CS2)  |
+ +------------------------+      +----------------------+      +-----------------------+
+                                            |
+                                            v
+                                 +----------------------+
+                                 | Active Countermeasure|
+                                 | (Strobe / Solenoid)  |
+                                 +----------------------+
+
+Role of Components:
+- Sensing Subsystem: RCWL-0516/PIR sensors provide immediate hardware interrupt pulses to
+  the MCU. The MLX90614 contactless thermometer and VL53L0X ToF laser sensor perform
+  localized target validation.
+- Actuation Subsystem: Pan and tilt servos reposition the sensor array directly toward the
+  threat vector. MOSFET gate driver circuits power the high-intensity strobe light and
+  12V solenoid.
+- Communication & Storage Subsystem: The nRF24L01 module manages the 2.4 GHz wireless
+  handshake. The MicroSD card module stores event timestamps, angles, and heat levels. The
+  FTDI bridge transmits telemetry to the laptop.
+
+ATmega32 Interface Pinout Allocation Map:
+- PD0 (RXD), PD1 (TXD): Hardware USART -> FTDI Serial-to-USB Bridge (115200 Baud)
+- PD2 (INT0): External Interrupt 0 -> Left Sector Sensor Trigger
+- PD3 (INT1): External Interrupt 1 -> Center Sector Sensor Trigger
+- PB2 (INT2): External Interrupt 2 -> Right Sector Sensor Trigger
+- PB3 (OC0): Timer0 Hardware PWM -> Pan Servo Motor Control Signal
+- PD7 (OC2): Timer2 Hardware PWM -> Tilt Servo Motor Control Signal
+- PC0 (SCL), PC1 (SDA): Hardware TWI (I2C) -> Shared Bus: MLX90614, VL53L0X & 16x2 LCD
+- PB5 (MOSI), PB6 (MISO), PB7 (SCK): Hardware SPI Bus -> Shared Bus: nRF24L01 & MicroSD Module
+- PD4: GPIO Output -> MicroSD Chip Select (CS_SD)
+- PD5: GPIO Output -> nRF24L01 Chip Select (CS_RF)
+- PD6: GPIO Output -> Active Countermeasure (Strobe / Solenoid MOSFET Gate)
+- PA0 (ADC0): Hardware ADC Channel 0 -> System Battery Voltage Monitor
+
+
+4. ROLE OF THE ATmega32
+--------------------------------------------------------------------------------
+The ATmega32 acts as the central real-time Finite State Machine (FSM), controlling signal
+acquisition, bus arbitrations, timing, and peripheral management:
+
+  [ IDLE SCAN ] ---> (Interrupt Trigger) ---> [ PAN-TILT SLEW ]
+                                                   |
+  [ COUNTERMEASURE ] <--- (Hostile) <--- [ VERIFY: Heat + ToF + IFF ]
+
+Peripheral Utilization Breakdown:
+- GPIO: Drives MOSFET power stages, status indicators, and individual Chip Select (CS)
+  control lines for shared SPI bus devices.
+- External Interrupts (INT0, INT1, INT2): Provides sub-millisecond intrusion detection
+  across Left, Center, and Right sectors without MCU polling overhead.
+- Timers & Hardware PWM:
+  * Timer0 (8-bit) & Timer2 (8-bit): Configured in Phase-Correct/Fast PWM mode generating
+    50 Hz waveforms on OC0 and OC2 for smooth dual-axis servo positioning.
+  * Timer1 (16-bit): Serves as the microsecond system clock counter for non-blocking task
+    scheduling and delay timing.
+- Hardware TWI (I2C): Configured at 100 kHz to communicate with the MLX90614 thermal sensor
+  (0x5A), VL53L0X ToF laser (0x29), and local LCD.
+- Hardware SPI: Operates at 4 MHz master mode, multiplexed between the nRF24L01 wireless
+  transceiver and MicroSD card logger using software-managed CS pins.
+- Hardware USART: Operates at 115200 baud, continuously outputting telemetry frames
+  ($ANGLE, DIST, TEMP, STATUS#) to the host PC.
+- Analog-to-Digital Converter (ADC): Reads supply voltage levels via ADC0 to detect low-power
+  conditions.
+
+
+5. IMPLEMENTATION PLAN
+--------------------------------------------------------------------------------
+Expected Outcome:
+A physical prototype featuring a dual-axis targeting turret, multi-sector perimeter
+detection, thermal/laser multi-sensor verification, wireless IFF badge authentication,
+real-time SD card logging, and an active PC graphical radar dashboard.
+
+Development Stages:
+
+PROJECT UPDATE 1 (Weeks 1-3):
+- Milestone 1.1: Bare-metal ATmega32 clock, power circuit, and basic register setup.
+- Milestone 1.2: Timer0/Timer2 50 Hz PWM configuration for dual-axis servo panning.
+- Milestone 1.3: Hardware I2C driver implementation; reading MLX90614 temperature and
+  VL53L0X distance data.
+- Milestone 1.4: External interrupt handling for multi-sector PIR/Radar detection.
+Deliverable: Turret automatically slews to an activated sector and outputs target distance
+and temperature over UART terminal.
+
+FINAL DEMONSTRATION (Weeks 4-6):
+- Milestone 2.1: Hardware SPI bus multiplexing (nRF24L01 + MicroSD card module with
+  independent CS handling).
+- Milestone 2.2: Implementation of wireless IFF challenge-response handshake logic.
+- Milestone 2.3: Development of the Python-based PC Tactical Radar GUI dashboard over UART.
+- Milestone 2.4: Integration of active countermeasure MOSFET drive outputs (Strobe/Solenoid).
+- Milestone 2.5: System enclosure assembly, power bus decoupling, stress testing, and tuning.
+Deliverable: Complete operational platform demonstrating threat identification, target
+tracking, friend-or-foe disarm, and real-time PC radar visualization.
+
+Group Member Responsibilities:
+- Member 1 (Embedded Firmware & Control Lead): ATmega32 register-level driver development
+  (Timers, PWM, I2C, External Interrupts), core finite state machine (FSM) architecture, and
+  timing loop optimization.
+- Member 2 (Hardware, Power & Actuation Lead): Mechanical pan-tilt turret assembly, power
+  distribution (buck converters/filtering), sensor calibration (MLX90614, VL53L0X), and
+  MOSFET countermeasure driver circuitry.
+- Member 3 (Wireless, Storage & PC GUI Lead): Hardware SPI bus management (nRF24L01
+  transceiver + MicroSD card file system), IFF protocol logic, and Python Tactical Radar GUI
+  development.
+
+
+6. USE OF OTHER CONTROLLERS (OPTIONAL)
+--------------------------------------------------------------------------------
+The ATmega32 is the sole main microcontroller executing all core logic, sensor readings,
+motor drives, storage logging, and telemetry streaming.
+
+Auxiliary Controller Usage:
+A standalone Arduino Nano / ATtiny85 is used exclusively as a remote wearable badge for
+the wireless Friend-or-Foe (IFF) authentication system.
+- Why Required: The badge is a mobile, battery-powered node distinct from the main turret
+  station.
+- Tasks: Listens for a 2.4 GHz challenge packet from the ATmega32 turret via its own
+  nRF24L01 module and responds with a pre-shared 32-bit authorization hash.
+- Communication Interface: Communicates strictly wirelessly over the air via 2.4 GHz RF
+  packets. It performs no main system tasks.
+
+
+7. TESTING AND SUCCESS CRITERIA
+--------------------------------------------------------------------------------
+Testing Methodology:
+1. PWM & Turret Accuracy: Measure output frequencies on OC0 and OC2 using an oscilloscope
+   to verify stable 50 Hz waveforms and smooth angular slewing.
+2. Interrupt Latency: Test sensor response time by measuring the time delta between sector
+   sensor triggers and turret movement initiation.
+3. I2C Bus Stability: Verify clock signal integrity on SCL (100 kHz) with multiple target
+   devices active.
+4. RF Handshake Latency: Perform range and response timing tests for the nRF24L01
+   challenge-response loop.
+
+Measurable Success Criteria:
+- Turret Slew Speed: Pan-tilt turret aligns to target sector vector within < 500 ms of trigger.
+- Distance Range & Precision: VL53L0X ToF laser measures target distance up to 1.5 m with
+  +/- 5 mm accuracy.
+- Thermal Verification Delta: Accurately detects target heat differentials (Delta T >= 3 deg C
+  above ambient room temperature).
+- IFF Handshake Execution: Complete challenge-response authentication executed within < 30 ms.
+- Telemetry Streaming Rate: PC GUI updates radar graphics continuously at >= 10 Hz without
+  frame loss.
+
+Essential vs. Optional Features:
+Essential:
+- Multi-sector interrupt detection
+- Dual-axis hardware PWM servo tracking
+- I2C Thermal & Laser distance check
+- Basic countermeasure trigger output
+
+Optional:
+- MicroSD black-box event logger
+- High-resolution Python PC Radar GUI
+- Audio frequency warning tone generator
+- Battery voltage monitoring via ADC
+
+
+8. CHALLENGES AND FUTURE SCOPE
+--------------------------------------------------------------------------------
+Technical & Hardware Challenges:
+- SPI Bus Contention: Sharing the hardware SPI bus between the nRF24L01 (requires ultra-low
+  latency) and the MicroSD Card module (requires bulk sector writes) can cause bus lockups.
+  Mitigation: Utilize dedicated software-controlled CS lines with explicit bus release routines.
+- Inductive Noise & Current Spikes: Servo motor current draws during rapid repositioning can
+  induce voltage dips, potentially causing ATmega32 brown-out resets. Mitigation: Implement
+  isolated power rails using separate buck converters for logic (5V) and servos (6V), alongside
+  bulk decoupling capacitors (1000 uF).
+- Non-Blocking I2C Polling: Slow response times from I2C sensors could delay main loop execution.
+  Mitigation: Implement a state-driven polling mechanism rather than blocking delays.
+
+Future Scope:
+- Computer Vision Integration: Incorporate an ESP32-CAM co-processor for AI-based facial
+  recognition and visual target classification.
+- 360-Degree Continuous Slewing: Replace standard 180-degree servos with continuous stepper
+  motors and slip rings for full 360-degree perimeter tracking.
+- Long-Range LoRa Mesh Telemetry: Upgrade the wireless link to LoRa for multi-kilometer
+  perimeter networking across multiple deployed units.
+================================================================================
