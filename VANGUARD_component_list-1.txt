@@ -1,0 +1,171 @@
+====================================================================
+VANGUARD — Autonomous Smart Perimeter Monitoring & Warning Platform
+FULL COMPONENT / SHOPPING LIST  (Robotics BD / TechShop BD / local market)
+====================================================================
+Notes tagged [O] = optional / stretch feature per your own testing
+table — buy it, but you can return it later if you skip that feature.
+Notes tagged (**NEW**) = only surfaced after I simulated the full
+build start-to-finish (see the notes block at the very end).
+
+--------------------------------------------------------------------
+1. CORE CONTROLLER & PROGRAMMING
+--------------------------------------------------------------------
+ATmega32-16PU (DIP-40)                       x1   [no spare needed — this rarely dies; the parts that die are in Section 4 & 9]
+--40-pin DIP IC socket                          x1   [solder this, not the chip — lets you swap the MCU without re-soldering]
+11.0592 MHz crystal oscillator                x1   [gives EXACT 115200 baud UART timing — 16MHz also "works" but with baud error]
+22pF ceramic capacitor                        x2   [one on each crystal leg to GND]
+10kΩ resistor                                 x1   [RESET pin pull-up]
+Tactile push button (4-pin)                   x1   [manual reset button, wire across RESET-to-GND through this]
+100nF ceramic capacitor (reset debounce)       x1   [across the reset button]
+USBasp ISP programmer (with cable)            x1   [most kits already include a 10-pin ribbon cable — check before buying separately]
+10-pin to 6-pin ISP adapter                   x1   [only buy separately if your USBasp kit doesn't already include one]
+2x5 (10-pin) box header                       x1   [solder onto your board as the ISP connector]
+
+--------------------------------------------------------------------
+2. MOTION DETECTION (PIR)
+--------------------------------------------------------------------
+PIR motion sensor (HC-SR501)                  x4   [need 3, buying 1 spare — cheap and occasionally DOA out of the box]
+3-pin female-to-female jumper wire, 20-30cm   x9   (3 sets of 3) [PIR header is male; these extend each sensor out to its 30°/90°/150° mount and back to the board]
+Small mounting frame/mast for 3 PIR sensors   x1   (**NEW**) [DIY — cardboard, acrylic strip, or wood works; needed to physically hold 3 PIRs at fixed 30°/90°/150° angles around the base — not sold as a "component" per se, but flagging so you don't forget it]
+
+--------------------------------------------------------------------
+3. THERMAL + DISTANCE VERIFICATION (I2C)
+--------------------------------------------------------------------
+MLX90614 IR sensor breakout (GY-906)          x1   [most GY-906 boards already have an onboard 3.3V regulator — check listing before adding external AMS1117 in Section 11]
+VL53L0X ToF breakout                          x1   [most VL53L0X breakouts sold in BD (GY-VL53L0XV2 etc.) already regulate to 3.3V and are usually fine on a 5V I2C bus — check listing before adding a level shifter in Section 11]
+4.7kΩ resistor (I2C pull-up)                  x2   [only needed if NEITHER breakout already has onboard SDA/SCL pull-ups — check silkscreen/listing first, don't buy blind]
+Small opaque shroud/hood over both sensors    x1   (**NEW**) [proposal calls for a "printed shroud" to block ambient IR/sunlight interference — a short piece of heat-shrink tube or black tape works as a zero-cost first try before 3D printing one]
+
+--------------------------------------------------------------------
+4. WIRELESS IFF LINK (nRF24L01+)
+--------------------------------------------------------------------
+nRF24L01+ module (bare)                       x4   [need 2 total — 1 main station + 1 badge — buying 2 spares because this is THE most common first-power-on casualty]
+10µF electrolytic capacitor                   x4   [bridge directly across VCC-GND at EACH bare nRF24 module — fixes ~80% of "nRF24 not responding" issues; skip only if you instead buy the adapter-board version below]
+nRF24L01+ "adapter board" version (onboard AMS1117 3.3V + cap)   x0-2 [OPTIONAL SWAP — some shops sell nRF24 pre-mounted on a small adapter board with built-in regulation/filtering; if available, buy this INSTEAD of 2 of the bare modules above and skip 2 of the 10µF caps]
+
+--------------------------------------------------------------------
+5. AUXILIARY IFF BADGE (wearable, separate controller)
+--------------------------------------------------------------------
+Arduino Nano                                  x1   [easier choice than ATtiny85 — onboard 5V regulator, USB programming, no extra parts needed for the MCU itself]
+9V battery + 9V clip with barrel plug          x1   [powers Nano via VIN pin]
+0.96" I2C OLED display (SSD1306)              x1   [O — spectator demo aid only, zero cost to main system logic, safe to skip first order]
+Small project enclosure (badge-sized)          x1   [O — wearable housing]
+SPDT slide switch                             x1   [badge power on/off]
+220Ω resistor (SPI signal protection)          x3   (**NEW**) [Nano's SPI runs at 5V logic but nRF24L01+ wants 3.3V — power the nRF24 from Nano's onboard 3.3V pin (it has one) and put these in series on MOSI/SCK/CSN as cheap protection instead of a full level-shifter module. This only surfaced when I traced the badge's wiring in the simulation below — the main proposal doesn't mention it because it only discusses level shifting for the MAIN station.]
+
+--------------------------------------------------------------------
+6. PAN-TILT ACTUATION
+--------------------------------------------------------------------
+MG996R servo                                  x2   [no spare — servos rarely fail; the real risk is the power rail, covered in Section 10]
+Pan-tilt bracket kit, MG996R-compatible        x1   [MUST say "MG996R" — many cheap kits are sized only for SG90 micro servos and won't fit. This kit's top plate is also where MLX90614+VL53L0X get mounted together — that's your sensor gimbal, don't buy a separate mount for that]
+M3 screw + nut assortment pack                x1   [servo horn / bracket / sensor mounting]
+
+--------------------------------------------------------------------
+7. BLACK-BOX LOGGING  [O — optional/stretch feature]
+--------------------------------------------------------------------
+MicroSD card module, SPI, WITH onboard level shifter/3.3V reg   x1   [O — buy the "with level shifter" version specifically, not the bare module, since your ATmega32 side is 5V]
+MicroSD card, 1-8GB, any brand                x1   [O — small capacity is fine, Petit FatFs only does raw block writes]
+
+--------------------------------------------------------------------
+8. TELEMETRY DASHBOARD  [O — optional/stretch feature]
+--------------------------------------------------------------------
+FTDI FT232RL USB-to-serial breakout            x1   [O — confirm the onboard jumper is set to 5V (not 3.3V) before wiring to ATmega32 TX/RX]
+USB cable matching your FT232RL board's port   x1   [O — Mini-B or Micro-B depending on the exact board]
+
+--------------------------------------------------------------------
+9. WARNING OUTPUT
+--------------------------------------------------------------------
+Logic-level N-channel MOSFET (IRLZ44N or similar)   x3   [need 1, buying 2 spares — cheap and easy to pop while testing gate drive]
+220Ω resistor (MOSFET gate series)             x3   [one per MOSFET bought above]
+10kΩ resistor (MOSFET gate pull-down)          x3   [prevents a floating gate from false-triggering the warning output; one per MOSFET]
+1N4007 diode (flyback)                        x3   [across the strobe/buzzer coil to clamp switch-off voltage spikes — one per MOSFET, cheap enough to spare]
+Rotating strobe light OR LED flasher/beacon (12V)   x1   [flasher-only is enough to pass the "Warning output — correct MOSFET switching" test criterion. A buzzer is not required by itself.]
+Piezo buzzer, active, 5-12V                   x1   [O — pair with the flasher above for audible+visual if you want it; otherwise skip, flasher alone satisfies the test]
+
+--------------------------------------------------------------------
+10. POWER REGULATION
+--------------------------------------------------------------------
+LM2596 adjustable buck converter module, 3A-rated   x2   [buy the 3A version specifically, not the cheaper 2A one — 1 set to 5V for logic rail, 1 set to 6V for servo rail. SET AND VERIFY the voltage with a multimeter BEFORE connecting anything to it.]
+1N5819 Schottky diode                          x1   [isolates the 5V logic rail from 6V servo-switching transients, per the proposal's design]
+1000µF 16V electrolytic capacitor              x1   [bulk cap on the 6V servo rail — absorbs MG996R stall-current spikes]
+100nF ceramic capacitor (general decoupling)   x12   [place one across VCC-GND at every module: ATmega32(x2), MLX90614, VL53L0X, each nRF24 (x2), MicroSD module, FT232RL, badge Nano, badge OLED — buy extra, they're pennies each]
+12V DC power adapter, 3A minimum               x1   (qty note **UPDATED**) [feeds both LM2596 converters; bumped from a typical "2A" spec because MG996R stall current (~2.5A each, staggered) + logic + strobe can peak close to 3A combined — don't undersize this]
+DC barrel jack, panel-mount, matching adapter   x1   [clean power-in connector for the enclosure]
+SPST rocker or toggle switch                  x1   [main power on/off]
+Inline fuse holder (5x20mm) + 3A fuse          x1   (**NEW** + qty updated) [cheap insurance on the main input line — sized to 3A to match the adapter, not the 1A I'd have picked without checking the servo stall-current math]
+2-pin screw terminal block (5.08mm pitch)      x6   (**NEW**) [distribute power/ground cleanly to each subsystem instead of daisy-chaining jumper wires off one point — this is where "common ground" from the proposal's challenges section actually gets implemented]
+
+--------------------------------------------------------------------
+11. 3.3V REGULATION / LEVEL SHIFTING (main station)
+--------------------------------------------------------------------
+AMS1117-3.3 regulator breakout                x1   [buy ONLY if your VL53L0X / nRF24L01+ breakouts turn out to be bare chips with no onboard regulator — check Section 3 & 4 notes first]
+I2C/SPI bidirectional logic level shifter (4/8-ch)   x1   [buy ONLY if the breakouts you got pass 3.3V signals straight through with no shifting — many BD-sold boards already handle this onboard, so you may end up needing NEITHER of these two lines. Check before adding to cart.]
+
+--------------------------------------------------------------------
+12. WIRING
+--------------------------------------------------------------------
+Male-to-Male jumper wires (breadboard)        x40  [breadboard-to-breadboard]
+Male-to-Female jumper wires (Dupont)          x40  [breakout module pins → board headers — you'll use this type the most]
+Female-to-Female jumper wires (Dupont)        x40  [module-to-module, e.g. bare nRF24 pins → board female headers]
+22AWG stranded hookup wire, red+black, 5m each   x2 rolls   [power rail wiring — jumper wires are too thin/unreliable for servo and strobe current]
+2.54mm male pin header strip                  x4   [solder onto perfboard or any breakout pads that came without headers]
+2.54mm female pin header strip                x2   [same, female side]
+
+--------------------------------------------------------------------
+13. PROTOTYPING & ENCLOSURE
+--------------------------------------------------------------------
+830-point breadboard                          x2   [initial dev/testing before final solder]
+Single-sided perfboard/stripboard (~10x15cm)   x2   [final soldered build once the breadboard version works]
+Project enclosure box, plastic (~200x150x80mm)   x1   [houses the ATmega32 board + power section]
+Nylon standoffs + screws, M3 assortment        x1 set   [mount PCB inside enclosure]
+Cable ties, small (100mm)                     x1 pack  [wire management]
+Heat shrink tubing, assorted sizes            x1 pack  [insulate soldered joints, especially on the power rail]
+Double-sided foam tape                        x1 roll  [mount PIRs / sensor shroud without drilling]
+
+--------------------------------------------------------------------
+14. TOOLS & CONSUMABLES (skip anything you already own)
+--------------------------------------------------------------------
+Soldering iron (30-40W) + stand               x1
+Solder wire, 60/40, 0.8mm                     x1 roll
+Digital multimeter                            x1   [ESSENTIAL — you MUST set the LM2596 output voltage with this before connecting anything to it. Do not skip.]
+Wire stripper/cutter                          x1
+
+====================================================================
+BUILD SIMULATION — walking the project start to finish
+====================================================================
+I mentally built this in order (power → MCU → sensing → actuation →
+wireless → warning → enclosure) to check nothing was missing. Three
+real gaps turned up that weren't obvious from the proposal text alone:
+
+1. BADGE-SIDE LEVEL SHIFTING: The proposal only discusses 3.3V
+   level shifting for the MAIN station's VL53L0X/nRF24L01+. But the
+   wearable badge ALSO has a 5V Nano talking SPI to a 3.3V nRF24 —
+   same problem, different location. Fixed with the 220Ω series
+   resistors in Section 5 (cheaper than a full level shifter for a
+   low-speed link like this) + powering that nRF24 off the Nano's
+   onboard 3.3V pin.
+
+2. CURRENT BUDGET ON THE MAIN ADAPTER: Doing the math on staggered
+   MG996R stall current (~2.5A) + logic + strobe/buzzer pushed me to
+   bump the adapter and fuse from a "safe-sounding" 2A/1A to 3A/3A.
+   An undersized adapter here would brown out mid-slew.
+
+3. POWER DISTRIBUTION HARDWARE: The proposal's "common ground"
+   design note has no corresponding purchasable part in the original
+   component table — you'd hit this gap only once you're literally
+   staring at 6+ modules needing a shared 5V/6V/GND point. Added
+   screw terminal blocks (Section 10) to solve it cleanly instead of
+   twisting jumper wires together.
+
+Everything else in the block diagram / pinout map (PIR→INT0/1/2,
+I2C bus, SPI bus + CS lines, PWM→servos, GPIO→MOSFET) maps directly
+onto components already in Sections 1-9 above — nothing else was
+missing in the simulation.
+
+====================================================================
+SHOPPING NOTE
+====================================================================
+Want this split into "likely on Robotics BD" vs "likely needs
+TechShop BD / local electronics market (Nawabpur/Stadium Market)"?
+Just say so and I'll organize it that way for your actual cart.
+====================================================================
