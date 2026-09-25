@@ -55,15 +55,14 @@
 #define US_TO_TICKS(us)                                                        \
   ((uint16_t)(((uint32_t)(us) * (F_CPU / 1000000UL)) / 8UL))
 
-/* ---------- Pan Servo Tunables (Safe Margins to Prevent Over-Rotation)
- * ---------- */
-#define SERVO_MIN_US 1000  /* Safe lower limit (0 deg) */
-#define SERVO_MAX_US 2000  /* Safe upper limit (180 deg) */
-#define PAN_CENTER_US 1500 /* Center / Neutral pulse (90 deg) */
+/* ---------- Pan Servo Tunables (Safe 20° to 160° Margins) ---------- */
+#define SERVO_MIN_US 1110  /* Safe lower limit (20 deg / 1110 us) */
+#define SERVO_MAX_US 1890  /* Safe upper limit (160 deg / 1890 us) */
+#define PAN_CENTER_US 1500 /* Center / Neutral pulse (90 deg / 1500 us) */
 #define PAN_LEFT_80_US                                                         \
-  1050 /* Left Sector Limit (~15 deg, safe sweep without hitting stop) */
+  1110 /* Left Sector Limit (20 deg, safe sweep without hitting stop) */
 #define PAN_RIGHT_80_US                                                        \
-  1950 /* Right Sector Limit (~165 deg, safe sweep without hitting stop) */
+  1890 /* Right Sector Limit (160 deg, safe sweep without hitting stop) */
 
 /* ---------- Sensor Hardware State ---------- */
 Adafruit_VL53L0X lox = Adafruit_VL53L0X();
@@ -233,13 +232,21 @@ void setup() {
 
   /* 8. Initialize VL53L0X Laser ToF directly */
   Serial.print(F(" Step 4: Initializing VL53L0X Laser Sensor at 0x29... "));
-  if (lox.begin(VL53L0X_I2CADDR, false, &Wire)) {
-    vl53l0x_online = true;
-    lox.setMeasurementTimingBudgetMicroSeconds(100000);
-    Serial.println(F("[SUCCESS] Ready!"));
+  _delay_ms(100);
+  Wire.beginTransmission(VL53L0X_I2CADDR);
+  if (Wire.endTransmission() == 0) {
+    if (lox.begin(VL53L0X_I2CADDR, false, &Wire)) {
+      vl53l0x_online = true;
+      lox.setMeasurementTimingBudgetMicroSeconds(100000);
+      Serial.println(F("[SUCCESS] Ready!"));
+    } else {
+      vl53l0x_online = false;
+      Serial.println(
+          F("[WARNING] Driver init failed. Retrying in background."));
+    }
   } else {
     vl53l0x_online = false;
-    Serial.println(F("[WARNING] Not responding. Retrying in background."));
+    Serial.println(F("[WARNING] Address 0x29 NACKed. Retrying in background."));
   }
   Serial.flush();
 
@@ -297,6 +304,11 @@ void loop() {
       (now - last_reprobe_ms >= 3000)) {
     last_reprobe_ms = now;
     if (!vl53l0x_online) {
+      // Hard-reset VL53L0X MCU via XSHUT pin before re-initialization
+      PORTA &= ~(1 << LASER_XSHUT_BIT);
+      _delay_ms(20);
+      PORTA |= (1 << LASER_XSHUT_BIT);
+      _delay_ms(100);
       vl53l0x_online = lox.begin(VL53L0X_I2CADDR, false, &Wire);
       if (vl53l0x_online)
         lox.setMeasurementTimingBudgetMicroSeconds(100000);
@@ -365,26 +377,33 @@ void loop() {
 
     // Laser reading (VL53L0X)
     if (vl53l0x_online) {
-      VL53L0X_RangingMeasurementData_t measure;
-      lox.rangingTest(&measure, false);
-      // RangeStatus != 4 means valid phase reading
-      if (measure.RangeStatus != 4 && measure.RangeMilliMeter >= 15 &&
-          measure.RangeMilliMeter <= 2500) {
-        laser_raw_mm = measure.RangeMilliMeter;
-        laser_valid = true;
-        laser_consecutive_fails = 0;
-        if (laser_first_read) {
-          filtered_dist_mm = laser_raw_mm;
-          laser_first_read = false;
-        } else {
-          filtered_dist_mm =
-              (0.50f * laser_raw_mm) + (0.50f * filtered_dist_mm);
-        }
-      } else {
-        laser_valid = false;
-        if (++laser_consecutive_fails >= 15) {
+      // Hardware probe check: ensure address 0x29 ACKs on I2C bus
+      Wire.beginTransmission(VL53L0X_I2CADDR);
+      if (Wire.endTransmission() != 0) {
+        if (++laser_consecutive_fails >= 5) {
           laser_consecutive_fails = 0;
-          vl53l0x_online = false; // Trigger background re-init
+          vl53l0x_online =
+              false; // Only mark offline if hardware I2C ACK fails!
+        }
+        laser_valid = false;
+      } else {
+        laser_consecutive_fails = 0;
+        VL53L0X_RangingMeasurementData_t measure;
+        lox.rangingTest(&measure, false);
+        // RangeStatus != 4 means valid phase reading / target detected
+        if (measure.RangeStatus != 4 && measure.RangeMilliMeter >= 15 &&
+            measure.RangeMilliMeter <= 2500) {
+          laser_raw_mm = measure.RangeMilliMeter;
+          laser_valid = true;
+          if (laser_first_read) {
+            filtered_dist_mm = laser_raw_mm;
+            laser_first_read = false;
+          } else {
+            filtered_dist_mm =
+                (0.50f * laser_raw_mm) + (0.50f * filtered_dist_mm);
+          }
+        } else {
+          laser_valid = false; // Out of range or no target present
         }
       }
     }
@@ -1144,7 +1163,7 @@ void printDetailedStatus(void) {
     Serial.print(active_sector == SECTOR_LEFT ? F("LEFT") : F("RIGHT"));
     Serial.print(F(" SECTOR (Pass "));
     Serial.print(sweep_passes_completed);
-    Serial.println(F("/4)"));
+    Serial.println(F("/2)"));
   } else {
     Serial.print(F("TARGET LOCKED at "));
     Serial.print(getPanPulse());

@@ -1,219 +1,235 @@
 /*
  * =====================================================================================
- *  PROJECT: VANGUARD / CSE-316 - GY-906 (MLX90614) Thermal IR Sensor Test
+ *  PROJECT: GY-906 (MLX90614) Non-Contact Infrared Thermal Sensor Monitor
  * =====================================================================================
- *  MCU:           ATmega32A (8.0 MHz Internal RC Oscillator)
- *  Baud Rate:     9600 Baud
- *  Sensor:        GY-906 MLX90614 Contactless IR Temperature Sensor
- *  I2C Pins:      SCL = PC0 (Pin 22), SDA = PC1 (Pin 23)
- *  I2C Address:   0x5A (Default factory SMBus address)
- *  Indicators:    PB0 (Heartbeat LED), PA7 (High Temp / Fever Alert LED)
+ *  MCU:           ATmega32A (16.0 MHz External Crystal)
+ *  Baud Rate:     9600 Baud (8-N-1) on PD0(RXD) / PD1(TXD)
+ *  Sensor:        GY-906 MLX90614 Contactless IR Thermometer (I2C: 0x5A)
+ *  Alert Limit:   Object Temp >= 32.0 °C (or Delta >= 2.0 °C above Ambient)
  * =====================================================================================
- *  WIRING GUIDE:
- *  GY-906 Module Pin  -->  ATmega32A Pin
- *  --------------------------------------------------
- *  VIN / VCC          -->  +5V or +3.3V Power Rail
- *  GND                -->  Common Ground (Pin 11 or 31)
- *  SCL                -->  PC0 (Pin 22) + 4.7k Pull-up to 5V
- *  SDA                -->  PC1 (Pin 23) + 4.7k Pull-up to 5V
+ * 
+ *  ATMEGA32A CONNECTION CONFIGURATION (DIP-40 PINOUT):
+ *  ---------------------------------------------------
+ * 
+ *                     +---[ \_/ ]---+
+ *     (Heartbeat)PB0 1 |             | 40  PA0
+ *                PB1 2 |             | 39  PA1
+ *                PB2 3 |             | 38  PA2
+ *                PB3 4 |             | 37  PA3
+ *                PB4 5 |             | 36  PA4
+ *                PB5 6 |   ATmega32A | 35  PA5
+ *                PB6 7 |    DIP-40   | 34  PA6
+ *                PB7 8 |             | 33  PA7 (High Temp Alert LED)
+ *             !RESET 9 |             | 32  AREF
+ *                VCC 10|             | 31  GND
+ *                GND 11|             | 30  AVCC
+ *              XTAL2 12|             | 29  PC7
+ *              XTAL1 13|             | 28  PC6
+ *         (RXD)  PD0 14|             | 27  PC5
+ *         (TXD)  PD1 15|             | 26  PC4
+ *                PD2 16|             | 25  PC3
+ *                PD3 17|             | 24  PC2
+ *                PD4 18|             | 23  PC1 (SDA - Sensor Data Line)
+ *                PD5 19|             | 22  PC0 (SCL - Sensor Clock Line)
+ *                PD6 20|             | 21  PD7
+ *                     +-------------+
+ * 
+ *  HARDWARE WIRING DETAILS:
+ *  ------------------------
+ *  1. Power & Clock:
+ *     - Pin 10 (VCC)    --> +5V
+ *     - Pin 11 (GND)    --> Common GND
+ *     - Pin 30 (AVCC)   --> +5V (Mandatory for Port A)
+ *     - Pin 31 (GND)    --> Common GND
+ *     - Pin 9  (!RESET) --> 10k resistor pull-up to +5V
+ *     - Pin 12 (XTAL2)  --> 16MHz Crystal + 22pF cap to GND
+ *     - Pin 13 (XTAL1)  --> 16MHz Crystal + 22pF cap to GND
+ * 
+ *  2. USB-to-TTL Serial Bridge (PL2303 / CP2102 / CH340 / FTDI):
+ *     - USB-TTL TXD     --> ATmega32 Pin 14 (PD0 / RXD)
+ *     - USB-TTL RXD     --> ATmega32 Pin 15 (PD1 / TXD)
+ *     - USB-TTL GND     --> Common GND (Mandatory)
+ *     - Baud Rate       --> 9600 Baud (8-N-1)
+ * 
+ *  3. GY-906 (MLX90614) Thermal Sensor (I2C / SMBus Interface):
+ *     - VIN / VCC       --> +5V or +3.3V
+ *     - GND             --> Common GND
+ *     - SCL             --> ATmega32 Pin 22 (PC0 / SCL)  [+ 4.7k pull-up to +5V]
+ *     - SDA             --> ATmega32 Pin 23 (PC1 / SDA)  [+ 4.7k pull-up to +5V]
+ * 
+ *  4. (Optional) Diagnostic LEDs:
+ *     - Heartbeat LED   --> ATmega32 Pin 1  (PB0) -> 330 ohm resistor -> GND
+ *     - Alert LED (+)   --> ATmega32 Pin 33 (PA7) -> 330 ohm resistor -> GND
  * =====================================================================================
  */
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <avr/io.h>
+#include <util/delay.h>
 
-#define MLX90614_I2CADDR 0x5A
+// Sensor I2C Address and RAM Registers
+#define MLX90614_I2CADDR  0x5A
+#define MLX90614_TA       0x06  // Ambient Temperature Register
+#define MLX90614_TOBJ1    0x07  // Object 1 Temperature Register
 
-// MLX90614 RAM Registers
-#define MLX90614_TA   0x06  // Ambient Temperature
-#define MLX90614_TOBJ1 0x07 // Object 1 Temperature
+// Hardware Pins
+#define HEARTBEAT_LED_BIT PB0   // Pin 1: Heartbeat LED
+#define ALERT_LED_BIT     PA7   // Pin 33: High Temp Alert LED
 
-// High Temperature / Fever Alert Threshold (in Celsius)
-#define FEVER_THRESHOLD_C 37.5f 
+// Alert Thresholds (Human Body Heat Signature)
+#define HEAT_THRESHOLD_C  32.0f // Object temperature threshold in Celsius
+#define DELTA_THRESHOLD_C 2.0f  // Object elevated above Ambient by 2.0 °C
 
-// Filtering factor for Exponential Moving Average (0.0 to 1.0)
-#define EMA_ALPHA 0.30f
-
-// Filtered temperature variables
+// Filtered object temperature
 float filtered_obj_c = 0.0f;
-bool first_read = true;
+bool first_temp_read = true;
 
-// Function prototype to read raw temperature from MLX90614 SMBus
-float readMLX90614TempC(uint8_t reg);
+// I2C Bus Recovery Sequence
+void i2c_bus_recovery(void) {
+  DDRC |= (1 << PC0) | (1 << PC1);
+  PORTC |= (1 << PC0) | (1 << PC1);
+  _delay_us(10);
 
-// Function to clear hung I2C bus by sending 9 SCL clock pulses
-void i2c_bus_recovery() {
-    DDRC |= (1 << PC0) | (1 << PC1); // SCL (PC0) and SDA (PC1) as outputs
-    PORTC |= (1 << PC0) | (1 << PC1); // High
+  for (uint8_t i = 0; i < 9; i++) {
+    PORTC &= ~(1 << PC0);
     _delay_us(10);
-
-    for (uint8_t i = 0; i < 9; i++) {
-        PORTC &= ~(1 << PC0); // SCL LOW
-        _delay_us(10);
-        PORTC |= (1 << PC0);  // SCL HIGH
-        _delay_us(10);
-    }
-
-    // Generate I2C STOP condition
-    PORTC &= ~(1 << PC1); // SDA LOW
+    PORTC |= (1 << PC0);
     _delay_us(10);
-    PORTC |= (1 << PC0);  // SCL HIGH
-    _delay_us(10);
-    PORTC |= (1 << PC1);  // SDA HIGH
-    _delay_us(10);
+  }
 
-    // Release pins back to floating input for Wire library
-    DDRC &= ~((1 << PC0) | (1 << PC1));
-    PORTC &= ~((1 << PC0) | (1 << PC1));
+  // STOP condition
+  PORTC &= ~(1 << PC1); _delay_us(10);
+  PORTC |= (1 << PC0);  _delay_us(10);
+  PORTC |= (1 << PC1);  _delay_us(10);
+
+  DDRC &= ~((1 << PC0) | (1 << PC1));
+  PORTC &= ~((1 << PC0) | (1 << PC1));
+}
+
+// Read raw 16-bit temperature from MLX90614 RAM over SMBus
+float readMLX90614TempC(uint8_t reg) {
+  Wire.beginTransmission(MLX90614_I2CADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) { // Repeated START
+    return -999.0f;
+  }
+
+  if (Wire.requestFrom((uint8_t)MLX90614_I2CADDR, (uint8_t)3) != 3) {
+    return -999.0f;
+  }
+
+  uint8_t lsb = Wire.read();
+  uint8_t msb = Wire.read();
+  uint8_t pec = Wire.read();
+  (void)pec;
+
+  // Check error bit
+  if (msb & 0x80) {
+    return -999.0f;
+  }
+
+  uint16_t tempRaw = ((uint16_t)msb << 8) | lsb;
+  return ((float)tempRaw * 0.02f) - 273.15f;
 }
 
 void setup() {
-    // 1. Setup Status Indicators (PB0 = Heartbeat, PA7 = High Temp Alert)
-    DDRB |= (1 << PB0);
-    PORTB |= (1 << PB0); // Heartbeat ON
+  // 1. Configure Alert and Heartbeat LEDs
+  DDRB |= (1 << HEARTBEAT_LED_BIT);
+  PORTB |= (1 << HEARTBEAT_LED_BIT);
 
-    DDRA |= (1 << PA7);
-    PORTA &= ~(1 << PA7); // Alert LED OFF initially
+  DDRA |= (1 << ALERT_LED_BIT);
+  PORTA &= ~(1 << ALERT_LED_BIT); // Alert LED OFF
 
-    // 2. Initialize Serial USART @ 9600 Baud
-    Serial.begin(9600);
-    _delay_ms(100);
+  // 2. Configure USART @ 9600 Baud with pull-up on RXD
+  PORTD |= (1 << PD0);
+  Serial.begin(9600);
+  delay(100);
 
-    Serial.println();
-    Serial.println(F("===================================================="));
-    Serial.println(F("  [MCU BOOT] ATmega32A GY-906 (MLX90614) Thermal Test"));
-    Serial.println(F("===================================================="));
-    Serial.println(F(" Clock: 8.0 MHz | Baud: 9600 | I2C: 100 kHz"));
-    Serial.println(F(" Step 1: Performing I2C Bus Recovery & Initializing Wire..."));
-    Serial.flush();
+  Serial.println();
+  Serial.println(F("=================================================================="));
+  Serial.println(F("   ATmega32A GY-906 (MLX90614) INFRARED THERMAL SENSOR MONITOR    "));
+  Serial.println(F("=================================================================="));
+  Serial.println(F(" Clock : 16.0 MHz | Baud: 9600 (PD0=RXD, PD1=TXD)                "));
+  Serial.println(F(" I2C   : Pin 22 (PC0=SCL), Pin 23 (PC1=SDA)                       "));
+  Serial.println(F(" Addr  : 0x5A | Alert: Obj >= 32.0 C or Delta >= +2.0 C           "));
+  Serial.println(F("=================================================================="));
+  Serial.print(F("Initializing I2C bus & probing GY-906 at 0x5A... "));
+  Serial.flush();
 
-    // 3. Clear any stuck I2C bus state from previous session
-    i2c_bus_recovery();
+  // 3. I2C Bus Recovery & Init
+  i2c_bus_recovery();
+  Wire.begin();
+  Wire.setClock(100000);
+#if defined(WIRE_TIMEOUT)
+  Wire.setWireTimeout(0); // Disable timeout to allow SMBus clock stretching
+#endif
+  PORTC |= (1 << PC0) | (1 << PC1); // Enable internal pull-ups
 
-    Wire.begin();
-    Wire.setClock(100000);
-    _delay_ms(100);
-
-    // 4. Probe I2C Bus for GY-906 MLX90614 Sensor at 0x5A
-    Serial.println(F(" Step 2: Probing GY-906 MLX90614 at I2C address 0x5A..."));
-    Serial.flush();
-
-    Wire.beginTransmission(MLX90614_I2CADDR);
-    uint8_t error = Wire.endTransmission();
-
-    if (error != 0) {
-        // Try bus recovery one more time before failing
-        i2c_bus_recovery();
-        Wire.beginTransmission(MLX90614_I2CADDR);
-        error = Wire.endTransmission();
-    }
-
-    if (error != 0) {
-        Serial.println(F(""));
-        Serial.println(F("===================================================="));
-        Serial.println(F(" [I2C ERROR] GY-906 (MLX90614) Sensor Not Responding!"));
-        Serial.println(F("===================================================="));
-        Serial.println(F(" Troubleshooting Checklist:"));
-        Serial.println(F("   1. SCL -> ATmega32 Pin 22 (PC0) + 4.7k Pull-up to 5V"));
-        Serial.println(F("   2. SDA -> ATmega32 Pin 23 (PC1) + 4.7k Pull-up to 5V"));
-        Serial.println(F("   3. VIN -> 3.3V / 5V, GND -> Common GND"));
-        Serial.println(F("   4. Verify I2C module address is 0x5A"));
-        Serial.println(F("===================================================="));
-        Serial.flush();
-
-        // Rapid LED blink to indicate I2C sensor detection error
-        while (1) {
-            PORTB ^= (1 << PB0);
-            _delay_ms(100);
-        }
-    }
-
-    Serial.println(F(" Step 3: [SUCCESS] GY-906 MLX90614 Sensor Detected!"));
-    Serial.println(F("----------------------------------------------------\r\n"));
-    Serial.flush();
+  // 4. Test initial read
+  float test_amb = readMLX90614TempC(MLX90614_TA);
+  if (test_amb > -100.0f) {
+    Serial.println(F("[SUCCESS] Sensor Online!"));
+    Serial.println(F("Starting real-time temperature measurements..."));
+  } else {
+    Serial.println(F("[FAILED!] Check wiring: SCL(Pin 22), SDA(Pin 23), 4.7k pullups."));
+  }
+  Serial.println(F("------------------------------------------------------------------"));
+  Serial.flush();
 }
 
 void loop() {
-    PORTB ^= (1 << PB0); // Toggle Heartbeat LED
+  // Toggle Heartbeat LED
+  PORTB ^= (1 << HEARTBEAT_LED_BIT);
 
-    // Read Ambient and Object Temperatures in Celsius
-    float amb_c = readMLX90614TempC(MLX90614_TA);
-    float obj_c = readMLX90614TempC(MLX90614_TOBJ1);
+  float amb_c = readMLX90614TempC(MLX90614_TA);
+  float obj_c = readMLX90614TempC(MLX90614_TOBJ1);
 
-    if (amb_c < -100.0f || obj_c < -100.0f) {
-        Serial.println(F("[ERROR] Failed to read SMBus data from MLX90614!"));
+  if (amb_c > -100.0f && obj_c > -100.0f) {
+    // Exponential Moving Average filter on object temperature (smooth noise)
+    if (first_temp_read) {
+      filtered_obj_c = obj_c;
+      first_temp_read = false;
     } else {
-        // Apply Exponential Moving Average (EMA) filter on Object Temperature
-        if (first_read) {
-            filtered_obj_c = obj_c;
-            first_read = false;
-        } else {
-            filtered_obj_c = (EMA_ALPHA * obj_c) + ((1.0f - EMA_ALPHA) * filtered_obj_c);
-        }
-
-        // Convert to Fahrenheit
-        float amb_f = (amb_c * 1.8f) + 32.0f;
-        float obj_f = (filtered_obj_c * 1.8f) + 32.0f;
-
-        // Output formatting over Serial UART
-        Serial.print(F("Ambient: "));
-        Serial.print(amb_c, 1);
-        Serial.print(F(" C ("));
-        Serial.print(amb_f, 1);
-        Serial.print(F(" F) | Object: "));
-        Serial.print(filtered_obj_c, 1);
-        Serial.print(F(" C ("));
-        Serial.print(obj_f, 1);
-        Serial.print(F(" F)"));
-
-        // High Temperature / Fever Alert Indicator
-        if (filtered_obj_c >= FEVER_THRESHOLD_C) {
-            PORTA |= (1 << PA7); // Turn ON Alert LED
-            Serial.print(F("  <-- [ALERT: HIGH TEMP!]"));
-        } else {
-            PORTA &= ~(1 << PA7); // Turn OFF Alert LED
-        }
-
-        Serial.println();
+      filtered_obj_c = (0.35f * obj_c) + (0.65f * filtered_obj_c);
     }
 
-    delay(250); // Reading interval 250ms
-}
+    float amb_f = (amb_c * 1.8f) + 32.0f;
+    float obj_f = (filtered_obj_c * 1.8f) + 32.0f;
+    float delta_c = filtered_obj_c - amb_c;
 
-/**
- * @brief Reads 16-bit raw data from MLX90614 RAM register over SMBus and converts to Celsius
- * @param reg RAM Register address (MLX90614_TA or MLX90614_TOBJ1)
- * @return Temperature in degrees Celsius, or -999.0f on error
- */
-float readMLX90614TempC(uint8_t reg) {
-    // 1. Send Register Read Command over SMBus
-    Wire.beginTransmission(MLX90614_I2CADDR);
-    Wire.write(reg);
-    if (Wire.endTransmission(false) != 0) { // Repeated START
-        return -999.0f;
+    // Check if heat signature / elevated temperature is detected
+    bool heat_alert = (filtered_obj_c >= HEAT_THRESHOLD_C) || (delta_c >= DELTA_THRESHOLD_C);
+
+    if (heat_alert) {
+      PORTA |= (1 << ALERT_LED_BIT); // Alert LED ON
+      Serial.print(F("[!] >>> HEAT SIGNATURE DETECTED! "));
+    } else {
+      PORTA &= ~(1 << ALERT_LED_BIT); // Alert LED OFF
+      Serial.print(F("[THERMAL] "));
     }
 
-    // 2. Request 3 bytes: LSB, MSB, PEC (Packet Error Code CRC-8)
-    if (Wire.requestFrom((uint8_t)MLX90614_I2CADDR, (uint8_t)3) != 3) {
-        return -999.0f;
+    Serial.print(F("Amb: "));
+    Serial.print(amb_c, 1);
+    Serial.print(F(" C ("));
+    Serial.print(amb_f, 1);
+    Serial.print(F(" F) | Obj: "));
+    Serial.print(filtered_obj_c, 1);
+    Serial.print(F(" C ("));
+    Serial.print(obj_f, 1);
+    Serial.print(F(" F) | Delta: "));
+    if (delta_c >= 0) Serial.print(F("+"));
+    Serial.print(delta_c, 1);
+    Serial.print(F(" C"));
+
+    if (heat_alert) {
+      Serial.print(F(" <<<"));
     }
+    Serial.println();
+  } else {
+    PORTA &= ~(1 << ALERT_LED_BIT);
+    Serial.println(F("[ERROR] Failed to read from MLX90614!"));
+  }
 
-    uint8_t lsb = Wire.read();
-    uint8_t msb = Wire.read();
-    uint8_t pec = Wire.read(); // Read PEC CRC-8 byte
-    (void)pec; // Silence unused warning
-
-    // Check error bit (MSB bit 7 flags measurement errors)
-    if (msb & 0x80) {
-        return -999.0f;
-    }
-
-    // Combine MSB and LSB into 16-bit raw value
-    uint16_t tempRaw = ((uint16_t)msb << 8) | lsb;
-
-    // MLX90614 Resolution: 0.02 Kelvin per LSB
-    float tempK = tempRaw * 0.02f;
-
-    // Convert Kelvin to Celsius
-    return tempK - 273.15f;
+  delay(250); // Sample rate: ~4 readings per second
 }

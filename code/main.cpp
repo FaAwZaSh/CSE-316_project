@@ -49,7 +49,7 @@
 /* ---------- Tunables & Thresholds ---------- */
 #define PIR_DEBOUNCE_MS 250UL   /* Min ms between PIR trigger events */
 #define FEVER_THRESHOLD_C 37.5f /* Thermal alert threshold */
-#define NEAR_THRESHOLD_MM 1200  /* Max distance for target lock (1.2 meters) */
+#define NEAR_THRESHOLD_MM 350   /* Max distance for target lock (350 mm / 35 cm) */
 
 /* ---------- Hardware Timer Tick Conversion Macro ---------- */
 #define US_TO_TICKS(us)                                                        \
@@ -103,7 +103,7 @@ enum SectorTarget {
 
 static TurretState turret_state = TURRET_STANDBY;
 static SectorTarget active_sector = SECTOR_NONE;
-static uint8_t sweep_passes_completed = 0; // 4 passes = 2 complete round trips
+static uint8_t sweep_passes_completed = 0; // 2 passes = 1 complete round trip
 static uint32_t startup_stabilize_until =
     0; // Ignore warmup transients on power-up
 
@@ -117,7 +117,7 @@ static bool lock_logic_enabled =
 volatile uint16_t current_pan_us =
     PAN_CENTER_US; // Active pulse width on OC1A (PD5)
 volatile uint16_t target_pan_us = PAN_CENTER_US; // Slew destination pulse width
-volatile uint8_t step_us_per_tick = 2; // 3 us per 20ms tick = ~150 us/s
+volatile uint8_t step_us_per_tick = 3; // 3 us per 20ms tick = ~150 us/s
 volatile bool pan_is_slewing =
     false; // True while Timer1 ISR is actively stepping pulse
 volatile bool turret_motion_paused =
@@ -209,13 +209,12 @@ void setup() {
   sei();
 
   /* 4. Reset VL53L0X Laser ToF via XSHUT (PA0) */
-  Serial.println(
-      F(" Step 2: Resetting VL53L0X XSHUT Pin 40 (PA0)..."));
+  Serial.println(F(" Step 2: Resetting VL53L0X XSHUT Pin 40 (PA0)..."));
   Serial.flush();
   DDRA |= (1 << LASER_XSHUT_BIT);
   PORTA &= ~(1 << LASER_XSHUT_BIT); // Drive LOW (0V)
   delay(50);
-  PORTA |= (1 << LASER_XSHUT_BIT);  // Drive 5V HIGH output
+  PORTA |= (1 << LASER_XSHUT_BIT); // Drive 5V HIGH output
   delay(250); // 250ms settling delay for VL53L0X internal MCU boot
 
   /* 6. Perform I2C Bus Recovery */
@@ -243,7 +242,8 @@ void setup() {
       Serial.println(F("[SUCCESS] Ready!"));
     } else {
       vl53l0x_online = false;
-      Serial.println(F("[WARNING] Driver init failed. Retrying in background."));
+      Serial.println(
+          F("[WARNING] Driver init failed. Retrying in background."));
     }
   } else {
     vl53l0x_online = false;
@@ -383,7 +383,8 @@ void loop() {
       if (Wire.endTransmission() != 0) {
         if (++laser_consecutive_fails >= 5) {
           laser_consecutive_fails = 0;
-          vl53l0x_online = false; // Only mark offline if hardware I2C ACK fails!
+          vl53l0x_online =
+              false; // Only mark offline if hardware I2C ACK fails!
         }
         laser_valid = false;
       } else {
@@ -428,8 +429,9 @@ void loop() {
     }
 
     /* ----- 6. Target Lock Detection Logic during Search ----- */
+    static uint8_t lock_consecutive_hits = 0;
     if (lock_logic_enabled && turret_state == TURRET_SEARCHING) {
-      bool target_acquired = false;
+      bool target_candidate = false;
       const __FlashStringHelper *lock_reason = nullptr;
 
       bool laser_hit = laser_valid && (filtered_dist_mm >= 80.0f) &&
@@ -439,19 +441,26 @@ void loop() {
                             (filtered_obj_c - current_amb_c >= 1.0f));
 
       if (laser_hit && thermal_hit) {
-        target_acquired = true;
-        lock_reason = F("Laser Distance Target (<1.2m) + Elevated Thermal "
+        target_candidate = true;
+        lock_reason = F("Laser Distance Target + Elevated Thermal "
                         "Signature Confirmed");
       } else if (laser_hit) {
-        target_acquired = true;
-        lock_reason = F("Laser ToF Proximity Target (<1.2m) Detected");
+        target_candidate = true;
+        lock_reason = F("Laser ToF Proximity Target Detected");
       } else if (thermal_hit) {
-        target_acquired = true;
+        target_candidate = true;
         lock_reason = F("Thermal Heat Signature Detected");
       }
 
-      // If target confirmed -> LOCK POSITION!
-      if (target_acquired) {
+      if (target_candidate) {
+        lock_consecutive_hits++;
+      } else {
+        lock_consecutive_hits = 0;
+      }
+
+      // Require 2 consecutive confirmations (~240ms sustained detection) to lock
+      if (lock_consecutive_hits >= 2) {
+        lock_consecutive_hits = 0;
         turret_state = TURRET_TARGET_LOCKED;
         // Freeze pan immediately and synchronize target_pan_us to
         // current_pan_us
@@ -520,7 +529,7 @@ void loop() {
     Serial.print(active_sector == SECTOR_LEFT ? F("L") : F("R"));
     Serial.print(F("] Pass "));
     Serial.print(sweep_passes_completed + 1);
-    Serial.print(F("/4 | Pan:"));
+    Serial.print(F("/2 | Pan:"));
     Serial.print(getPanPulse());
     Serial.print(F("us | LASER:"));
     if (!vl53l0x_online) {
@@ -618,12 +627,12 @@ void triggerSectorSearch(SectorTarget sector) {
     Serial.println(
         F(" >>> [PIR TRIGGER: LEFT SECTOR] Motion detected on PIR 0 (INT0)!"));
     Serial.println(F("     Starting Gentle 70° Left Sector Search (1500 us <-> "
-                     "1050 us, 2 round trips)..."));
+                     "1050 us, 1 round trip)..."));
   } else {
     Serial.println(
         F(" >>> [PIR TRIGGER: RIGHT SECTOR] Motion detected on PIR 1 (INT1)!"));
     Serial.println(F("     Starting Gentle 70° Right Sector Search (1500 us "
-                     "<-> 1950 us, 2 round trips)..."));
+                     "<-> 1950 us, 1 round trip)..."));
   }
   Serial.println(
       F("=================================================================="));
@@ -658,8 +667,8 @@ void updateTurretSearch(uint32_t now) {
     if (!pan_is_slewing) {
       sweep_passes_completed++;
 
-      if (sweep_passes_completed >= 4) {
-        // Completed all 4 passes (2 round trips)
+      if (sweep_passes_completed >= 2) {
+        // Completed all 2 passes (1 round trip)
         turret_state = TURRET_STANDBY;
         active_sector = SECTOR_NONE;
         slewPanTo(PAN_CENTER_US);
@@ -670,7 +679,7 @@ void updateTurretSearch(uint32_t now) {
 
         formatTime(now);
         Serial.println();
-        Serial.println(F(" --- [SECTOR SEARCH COMPLETE] 2 round trips (4 "
+        Serial.println(F(" --- [SECTOR SEARCH COMPLETE] 1 round trip (2 "
                          "passes) finished."));
         Serial.println(F("     Turret PARKED at Center (1500 us). Resting "
                          "quietly for 4.0s settling delay."));
@@ -1163,7 +1172,7 @@ void printDetailedStatus(void) {
     Serial.print(active_sector == SECTOR_LEFT ? F("LEFT") : F("RIGHT"));
     Serial.print(F(" SECTOR (Pass "));
     Serial.print(sweep_passes_completed);
-    Serial.println(F("/4)"));
+    Serial.println(F("/2)"));
   } else {
     Serial.print(F("TARGET LOCKED at "));
     Serial.print(getPanPulse());
