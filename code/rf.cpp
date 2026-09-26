@@ -7,82 +7,23 @@
  *  Radio:             nRF24L01+ 2.4 GHz Transceiver (SPI + Control Lines)
  * =====================================================================================
  *  ROLE:
- *    Main Turret Station RF Sender. When triggered (or during periodic sector watch),
- *    transmits a rolling cryptographic challenge packet (32 bytes fixed).
- *    Immediately opens a strict 40 ms RX window to receive slotted, replay-protected
- *    responses from authorized personnel badges (slotted backoff = Badge ID * 4 ms).
+ *    Main Turret Station RF Sender. Transmits a rolling cryptographic challenge packet.
+ *    Listens for slotted, replay-protected responses from authorized personnel badges.
  *    - Valid Keyed Auth Token received: ACCESS GRANTED -> Friendly Detected
  *    - Timeout (40 ms) / Bad Token:    INTRUDER ALERT -> Hostile Lock / Alarm Trigger
  * =====================================================================================
  * 
- *  ATMEGA32A CONNECTION CONFIGURATION (DIP-40 PINOUT):
- *  ---------------------------------------------------
- * 
- *                     +---[ \_/ ]---+
- *     (Heartbeat)PB0 1 |             | 40  PA0
- *                PB1 2 |             | 39  PA1
- *                PB2 3 |             | 38  PA2 (CSN - nRF24L01 Chip Select Not)
- *                PB3 4 |             | 37  PA3 (CE  - nRF24L01 Chip Enable)
- *        (!SS)   PB4 5 |             | 36  PA4 (IRQ - nRF24L01 Interrupt / Pull-up)
- *        (MOSI)  PB5 6 |   ATmega32A | 35  PA5
- *        (MISO)  PB6 7 |    DIP-40   | 34  PA6
- *        (SCK)   PB7 8 |             | 33  PA7 (Alert / Lock Status LED)
- *             !RESET 9 |             | 32  AREF
- *                VCC 10|             | 31  GND
- *                GND 11|             | 30  AVCC
- *              XTAL2 12|             | 29  PC7
- *              XTAL1 13|             | 28  PC6
- *         (RXD)  PD0 14|             | 27  PC5
- *         (TXD)  PD1 15|             | 26  PC4
- *                PD2 16|             | 25  PC3
- *                PD3 17|             | 24  PC2
- *                PD4 18|             | 23  PC1
- *                PD5 19|             | 22  PC0
- *                PD6 20|             | 21  PD7
- *                     +-------------+
- * 
- *  nRF24L01+ 8-PIN MODULE PINOUT (TOP VIEW / PINS POINTING DOWN):
- *  --------------------------------------------------------------
- *       +-------+-------+
- *   GND | (1)   (2) | VCC (+3.3V ONLY!)
- *    CE | (3)   (4) | CSN
- *   SCK | (5)   (6) | MOSI
- *  MISO | (7)   (8) | IRQ
- *       +-------+-------+
- * 
- *  HARDWARE WIRING DETAILS:
- *  ------------------------
- *  1. Power & Clock:
- *     - Pin 10 (VCC)    --> +5V
- *     - Pin 11 (GND)    --> Common GND
- *     - Pin 30 (AVCC)   --> +5V (Mandatory for Port A logic)
- *     - Pin 31 (GND)    --> Common GND
- *     - Pin 9  (!RESET) --> 10k resistor pull-up to +5V
- *     - Pin 12 (XTAL2)  --> 16MHz Crystal + 22pF cap to GND
- *     - Pin 13 (XTAL1)  --> 16MHz Crystal + 22pF cap to GND
- * 
- *  2. USB-to-TTL Serial Bridge (PL2303 / CP2102 / CH340 / FTDI):
- *     - USB-TTL TXD     --> ATmega32 Pin 14 (PD0 / RXD)
- *     - USB-TTL RXD     --> ATmega32 Pin 15 (PD1 / TXD)
- *     - USB-TTL GND     --> Common GND (Mandatory)
- *     - Baud Rate       --> 9600 Baud (8-N-1)
- * 
- *  3. nRF24L01 2.4 GHz Transceiver Connections:
- *     - Pin 1 (GND)     --> Common GND
- *     - Pin 2 (VCC)     --> +3.3V POWER ONLY!
- *                           * CAUTION: Connecting to 5V will permanently burn the chip!
- *                           * Add a 10uF - 100uF electrolytic capacitor directly across
- *                             VCC and GND pins of the nRF24L01 for power rail stability.
- *     - Pin 3 (CE)      --> ATmega32 Pin 37 (PA3)
- *     - Pin 4 (CSN)     --> ATmega32 Pin 38 (PA2)
- *     - Pin 5 (SCK)     --> ATmega32 Pin 8  (PB7 / Hardware SCK)
- *     - Pin 6 (MOSI)    --> ATmega32 Pin 6  (PB5 / Hardware MOSI)
- *     - Pin 7 (MISO)    --> ATmega32 Pin 7  (PB6 / Hardware MISO)
- *     - Pin 8 (IRQ)     --> ATmega32 Pin 36 (PA4 / Input with Internal Pull-up)
- * 
- *  4. Indicators (Optional):
- *     - Pin 1  (PB0)    --> Green Heartbeat LED (+ 330 ohm resistor to GND)
- *     - Pin 33 (PA7)    --> Red Intruder / Lock LED (+ 330 ohm resistor to GND)
+ *  ATMEGA32A PIN CONNECTIONS (DIP-40):
+ *  -----------------------------------
+ *  CE        : Pin 37 (PA3)
+ *  CSN       : Pin 38 (PA2)
+ *  IRQ       : Pin 36 (PA4)
+ *  SS        : Pin 5  (PB4) -> Configured as Output (SPI Master)
+ *  MOSI      : Pin 6  (PB5)
+ *  MISO      : Pin 7  (PB6)
+ *  SCK       : Pin 8  (PB7)
+ *  Heartbeat : Pin 1  (PB0)
+ *  Alert LED : Pin 33 (PA7)
  * =====================================================================================
  */
 
@@ -107,7 +48,7 @@
 
 #define SPI_DDR   DDRB
 #define SPI_PORT  PORTB
-#define SS_BIT    PB4  // Pin 5  (Hardware SS - Must be configured as output!)
+#define SS_BIT    PB4  // Pin 5  (Hardware SS - Must be output!)
 #define MOSI_BIT  PB5  // Pin 6  (Hardware MOSI)
 #define MISO_BIT  PB6  // Pin 7  (Hardware MISO)
 #define SCK_BIT   PB7  // Pin 8  (Hardware SCK)
@@ -264,16 +205,18 @@ bool init_nrf24_station() {
   ce_low();
   _delay_ms(100);
 
-  nrf_write_reg(NRF_RF_CH, VANGUARD_RF_CHANNEL);
-  nrf_write_reg(NRF_RF_SETUP, VANGUARD_RF_SETUP_VAL); // 1 Mbps, -12 dBm
-  nrf_write_reg(NRF_SETUP_AW, 0x03);                 // 5-byte address width
+  nrf_write_reg(NRF_RF_CH, VANGUARD_RF_CHANNEL);         // Channel 76 (2.476 GHz)
+  nrf_write_reg(NRF_RF_SETUP, VANGUARD_RF_SETUP_VAL);     // 250 kbps, 0 dBm (Max Power), High LNA
+  nrf_write_reg(NRF_SETUP_AW, 0x03);                     // 5-byte address width
 
-  nrf_write_buf(NRF_TX_ADDR, VANGUARD_RF_ADDR, 5);
+  nrf_write_buf(NRF_TX_ADDR, VANGUARD_RF_ADDR, 5);       // "VANG1"
   nrf_write_buf(NRF_RX_ADDR_P0, VANGUARD_RF_ADDR, 5);
 
-  nrf_write_reg(NRF_EN_AA, 0x00);      // Custom slotted protocol without auto-ACK collisions
-  nrf_write_reg(NRF_EN_RXADDR, 0x01);  // Pipe 0 enabled
-  nrf_write_reg(NRF_RX_PW_P0, 32);     // 32-byte fixed payload width
+  // Enable Auto-ACK & 5 Retries (Forum Proven Approach)
+  nrf_write_reg(NRF_EN_AA, 0x01);                        // Auto-ACK enabled on Pipe 0
+  nrf_write_reg(NRF_SETUP_RETR, 0x55);                   // 1500 us delay, 5 hardware retries
+  nrf_write_reg(NRF_EN_RXADDR, 0x01);                    // Pipe 0 enabled
+  nrf_write_reg(NRF_RX_PW_P0, 32);                       // 32-byte fixed payload width
 
   nrf_flush_tx();
   nrf_flush_rx();
@@ -285,8 +228,9 @@ bool init_nrf24_station() {
 
   uint8_t cfg = nrf_read_reg(NRF_CONFIG);
   uint8_t ch  = nrf_read_reg(NRF_RF_CH);
+  uint8_t setup_val = nrf_read_reg(NRF_RF_SETUP);
 
-  return (cfg == 0x0E && ch == VANGUARD_RF_CHANNEL);
+  return (cfg == 0x0E && ch == VANGUARD_RF_CHANNEL && setup_val == VANGUARD_RF_SETUP_VAL);
 }
 
 // ---------- Switch Radio to RX Mode ----------
@@ -307,7 +251,8 @@ void set_station_tx_mode() {
 }
 
 // ---------- Transmit a 32-Byte Packet ----------
-void send_packet_raw(const void *packet_ptr) {
+// Keeps CE HIGH until transmission completes (prevents clone chip abort)
+bool send_packet_raw(const void *packet_ptr) {
   ce_low();
   nrf_flush_tx();
   nrf_clear_interrupts();
@@ -320,22 +265,28 @@ void send_packet_raw(const void *packet_ptr) {
   }
   csn_high();
 
-  // Pulse CE for >= 10us to trigger TX
+  // Hold CE high while transmitting
   ce_high();
-  _delay_us(15);
-  ce_low();
 
-  // Wait for TX FIFO transmission completion
-  uint16_t timeout = 2000;
+  // Wait for TX_DS or MAX_RT
+  uint16_t timeout = 3000;
+  bool success = false;
   while (timeout > 0) {
     uint8_t st = nrf_read_reg(NRF_STATUS);
-    if (st & (1 << 5)) { // TX_DS
+    if (st & (1 << 5)) { // TX_DS: ACK received or packet sent!
+      success = true;
+      break;
+    }
+    if (st & (1 << 4)) { // MAX_RT: Max retries exceeded
       break;
     }
     _delay_us(5);
     timeout--;
   }
+
+  ce_low();
   nrf_clear_interrupts();
+  return success;
 }
 
 // ---------- Check if Packet is in RX FIFO ----------
@@ -379,7 +330,7 @@ void execute_iff_challenge() {
 
   // 1. Generate Rolling Nonce (Cryptographic Replay Protection)
   uint32_t nonce = ((uint32_t)micros() << 16) | (uint16_t)rand();
-  if (nonce == 0) nonce = 0xA5A55A5A; // non-zero fallback
+  if (nonce == 0) nonce = 0xA5A55A5A;
 
   // 2. Prepare IFF Challenge Packet (Station -> Badge)
   IFFChallengePacket challenge;
@@ -395,21 +346,26 @@ void execute_iff_challenge() {
   Serial.print(global_seq);
   Serial.print(F(" (Nonce: 0x"));
   Serial.print(nonce, HEX);
-  Serial.println(F(")..."));
+  Serial.print(F(")... "));
 
-  // 3. Send Challenge Packet over 2.4 GHz RF
+  // 3. Send Challenge Packet over 2.4 GHz RF (250 kbps, 0 dBm)
   set_station_tx_mode();
-  send_packet_raw(&challenge);
+  bool tx_ok = send_packet_raw(&challenge);
+
+  if (tx_ok) {
+    Serial.println(F("[RF TX OK / ACK Received]"));
+  } else {
+    Serial.println(F("[RF TX Sent - Waiting for Slotted Reply]"));
+  }
 
   // 4. Immediately flip to RX mode & listen for slotted badge responses (<= 40 ms)
   set_station_rx_mode();
   uint32_t window_start_ms = millis();
   bool badge_authenticated = false;
-  bool retried = false;
   IFFResponsePacket response;
   memset(&response, 0, sizeof(response));
 
-  while ((millis() - window_start_ms) <= 40) {
+  while ((millis() - window_start_ms) <= 45) {
     if (has_incoming_packet()) {
       read_packet_raw(&response);
 
@@ -425,14 +381,6 @@ void execute_iff_challenge() {
           break;
         }
       }
-    }
-
-    // Anti-Drop Retry: If 15 ms has elapsed without a response, retransmit once
-    if (!retried && (millis() - window_start_ms) >= 15) {
-      retried = true;
-      set_station_tx_mode();
-      send_packet_raw(&challenge);
-      set_station_rx_mode();
     }
   }
 
@@ -460,7 +408,7 @@ void execute_iff_challenge() {
     intruder_count++;
     LED_ALERT_PORT |= (1 << LED_ALERT_BIT); // Alert LED ON
 
-    Serial.print(F("  >>> [INTRUDER ALERT] No Valid Badge Responded in 40 ms Window! (Elapsed: "));
+    Serial.print(F("  >>> [INTRUDER ALERT] No Valid Badge Responded in 45 ms Window! (Elapsed: "));
     Serial.print(elapsed_ms);
     Serial.println(F(" ms)"));
     Serial.println(F("  >>> Status: UNIDENTIFIED TARGET - Hostile Lock / Defensive Engagement"));
@@ -485,7 +433,8 @@ void setup() {
   Serial.println(F("   VANGUARD Autonomous Sentry - IFF Turret Station Node "));
   Serial.println(F("========================================================"));
   Serial.println(F("Protocol: VANGUARD Replay-Protected Challenge-Response"));
-  Serial.println(F("Channel : 76 (2.476 GHz) | Rate: 1 Mbps | Timeout: 40 ms"));
+  Serial.println(F("DataRate: 250 kbps | Power: 0 dBm (MAX) | Retries: 5x"));
+  Serial.println(F("Channel : 76 (2.476 GHz) | Timeout: 45 ms"));
   Serial.println(F("MCU     : ATmega32A DIP-40 @ 16.0 MHz"));
   Serial.println(F("--------------------------------------------------------"));
 
@@ -502,5 +451,5 @@ void setup() {
 
 void loop() {
   execute_iff_challenge();
-  _delay_ms(1000); // 1-second challenge interval (simulating periodic sector sweep)
+  _delay_ms(1000);
 }

@@ -13,7 +13,7 @@
 // =====================================================================================
 
 #define VANGUARD_RF_CHANNEL       76
-#define VANGUARD_RF_SETUP_VAL     0x02   // 1 Mbps, -12 dBm
+#define VANGUARD_RF_SETUP_VAL     0x27   // 250 kbps, 0 dBm (Max Power), High LNA Gain
 #define VANGUARD_SECRET_KEY       0x5A3C9E17UL
 
 #define PACKET_TYPE_CHALLENGE     0x01
